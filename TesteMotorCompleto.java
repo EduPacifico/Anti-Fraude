@@ -38,12 +38,21 @@ public class TesteMotorCompleto {
     }
 
     private static void imprimirResultado(Transacao tx) {
-        String icone = switch (tx.getStatus()) {
-            case APROVADA -> "✅";
-            case SUSPEITA -> "⚠️";
-            case BLOQUEADA -> "🛑";
-            default -> "❓";
-        };
+        String icone = "";
+switch (tx.getStatus()) {
+    case APROVADA: 
+        icone = "✅"; 
+        break;
+    case SUSPEITA: 
+        icone = "⚠️"; 
+        break;
+    case BLOQUEADA: 
+        icone = "🛑"; 
+        break;
+    default: 
+        icone = "❓"; 
+        break;
+}
 
         System.out.printf("%s Tx #%d | %d -> %d | R$ %8.2f | Score: %5.1f | Status: %-9s | Motivo: %s\n",
                 icone, tx.getId(), tx.getIdContaOrigem(), tx.getIdContaDestino(),
