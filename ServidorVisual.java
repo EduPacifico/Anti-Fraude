@@ -9,7 +9,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-import java.util.Random;
 
 public class ServidorVisual {
     private static MotorFraude motor;
@@ -20,7 +19,7 @@ public class ServidorVisual {
     private static int passoCicloAtual = 0;
     private static int passoFanInAtual = 0;
     private static int passoBurstAtual = 0;
-    private static int passoFluxoAtual = 0; // Novo controlador do pipeline
+    private static int passoFluxoAtual = 0; 
     
     private static final int[] ORIGENS_FAN_IN = {10, 15, 20, 25, 30};
     private static final int[] DESTINOS_BURST = {50, 60, 70, 80, 10, 30};
@@ -29,34 +28,36 @@ public class ServidorVisual {
     private static int totalBlocosSelados = 0;
     private static long contadorId = 1000L;
     private static long timestampAtual = System.currentTimeMillis();
-    private static final Random random = new Random(42);
 
     public static void main(String[] args) throws IOException {
         reiniciarSistema();
 
         HttpServer server = HttpServer.create(new InetSocketAddress(8080), 0);
-        server.createContext("/", new PaginaPrincipalHandler());
-        server.createContext("/api/smurfing/passo", new SmurfingPassoHandler());
-        server.createContext("/api/smurfing/reset", new SmurfingResetHandler());
-        server.createContext("/api/ciclo/passo", new CicloPassoHandler());
-        server.createContext("/api/ciclo/reset", new CicloResetHandler());
-        server.createContext("/api/fanin/passo", new FanInPassoHandler());
-        server.createContext("/api/fanin/reset", new FanInResetHandler());
-        server.createContext("/api/burst/passo", new BurstPassoHandler());
-        server.createContext("/api/burst/reset", new BurstResetHandler());
         
-        // Novos endpoints do Fluxo Completo
+        server.createContext("/", new PaginaPrincipalHandler());
         server.createContext("/api/fluxo/passo", new FluxoPassoHandler());
-        server.createContext("/api/fluxo/reset", new FluxoResetHandler());
-
-        server.createContext("/api/geral/processar", new GeralProcessarHandler());
+        server.createContext("/api/fluxo/reset", new ResetGeralHandler());
+        
+        server.createContext("/api/smurfing/passo", new SmurfingPassoHandler());
+        server.createContext("/api/smurfing/reset", new ResetGeralHandler());
+        
+        server.createContext("/api/ciclo/passo", new CicloPassoHandler());
+        server.createContext("/api/ciclo/reset", new ResetGeralHandler());
+        
+        server.createContext("/api/fanin/passo", new FanInPassoHandler());
+        server.createContext("/api/fanin/reset", new ResetGeralHandler());
+        
+        server.createContext("/api/burst/passo", new BurstPassoHandler());
+        server.createContext("/api/burst/reset", new ResetGeralHandler());
+        
         server.createContext("/api/contas/todas", new ListarTodasContasHandler());
-        server.createContext("/api/conta/extrato", new ExtratoContaHandler());
+
         server.setExecutor(null);
 
         System.out.println("=================================================================");
-        System.out.println(" Servidor Visual Iniciado (Com Aba de Pipeline de Transação)!");
+        System.out.println(" Servidor Visual Iniciado (Proteção Anti-Cache Ativada)!");
         System.out.println(" Acesse no navegador: http://localhost:8080");
+        System.out.println(" Lembre-se de dar Ctrl+F5 no navegador!");
         System.out.println("=================================================================");
         server.start();
     }
@@ -80,6 +81,7 @@ public class ServidorVisual {
         }
     }
 
+    // Método que estava faltando e causou o erro!
     private static void checarSelagemMerkle() {
         if (historicoDecisoes.size() > 0 && historicoDecisoes.size() % 10 == 0) {
             int inicio = historicoDecisoes.size() - 10;
@@ -90,6 +92,9 @@ public class ServidorVisual {
         }
     }
 
+    // =========================================================================
+    // HTML / JS / CSS 
+    // =========================================================================
     static class PaginaPrincipalHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
@@ -133,7 +138,7 @@ public class ServidorVisual {
             "    .chip.active { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }\n" +
             "    .deck { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(300px, 1fr); gap: 16px; align-items: start; }\n" +
             "    .panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }\n" +
-            "    .panel-head { padding: 10px 14px; border-bottom: 1px solid var(--line-soft); display: flex; justify-content: space-between; }\n" +
+            "    .panel-head { padding: 10px 14px; border-bottom: 1px solid var(--line-soft); display: flex; justify-content: space-between; align-items: center; }\n" +
             "    .panel-title { font-family: var(--font-display); font-weight: 600; font-size: 14px; margin: 0; }\n" +
             "    .stage { background: var(--stage); padding: 0; position: relative; height: 360px; display: flex; align-items: center; justify-content: center; }\n" +
             "    canvas { width: 100%; height: 100%; display: block; }\n" +
@@ -156,6 +161,8 @@ public class ServidorVisual {
             "    .tbtn:hover { border-color: var(--accent); color: var(--accent); }\n" +
             "    .tbtn.play { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); width: 50px; }\n" +
             "    .tbtn svg { width: 16px; height: 16px; fill: currentColor; }\n" +
+            "    .btn-small { background: var(--surface-2); border: 1px solid var(--line); border-radius: 4px; padding: 4px 10px; font-size: 11px; cursor:pointer; color: var(--ink-2); }\n" +
+            "    .btn-small:hover { border-color: var(--accent); color: var(--accent); }\n" +
             "    table { width: 100%; border-collapse: collapse; font-size: 13px; }\n" +
             "    th { background: var(--surface-2); padding: 8px; text-align: left; color: var(--ink-3); font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; border-bottom: 1px solid var(--line); }\n" +
             "    td { padding: 8px; border-bottom: 1px solid var(--line-soft); color: var(--ink); }\n" +
@@ -173,7 +180,7 @@ public class ServidorVisual {
             "    <div class=\"picker\">\n" +
             "      <span class=\"eyebrow\">Cenários e Algoritmos</span>\n" +
             "      <div class=\"chips\">\n" +
-            "        <button class=\"chip active\" onclick=\"mudarAba('fluxo', this)\">0. Pipeline Completo</button>\n" +
+            "        <button class=\"chip active\" onclick=\"mudarAba('fluxo', this)\">0. Pipeline de Transação</button>\n" +
             "        <button class=\"chip\" onclick=\"mudarAba('contas', this)\">1. Treap (Contas/Saldo)</button>\n" +
             "        <button class=\"chip\" onclick=\"mudarAba('smurfing', this)\">2. Janela: Smurfing</button>\n" +
             "        <button class=\"chip\" onclick=\"mudarAba('burst', this)\">3. Janela: Velocity Burst</button>\n" +
@@ -183,12 +190,14 @@ public class ServidorVisual {
             "    </div>\n" +
             "\n" +
             "    <div class=\"deck\">\n" +
-            "      <!-- COLUNA ESQUERDA: PALCO -->\n" +
             "      <div class=\"stage-col\">\n" +
             "        <section class=\"panel\">\n" +
             "          <div class=\"panel-head\">\n" +
             "            <h2 class=\"panel-title\" id=\"stage-title\">Dados em Memória</h2>\n" +
-            "            <span class=\"eyebrow\" id=\"stage-status\">Execução Ociosa</span>\n" +
+            "            <div id=\"controles-fluxo\" style=\"display:flex; gap:8px;\">\n" +
+            "               <button class=\"btn-small\" onclick=\"iniciarFluxo('legitima')\">▶ Simular Aprovada</button>\n" +
+            "               <button class=\"btn-small\" onclick=\"iniciarFluxo('fraude')\">▶ Simular Negada</button>\n" +
+            "            </div>\n" +
             "          </div>\n" +
             "          <div class=\"stage\" id=\"stage-container\">\n" +
             "             <canvas id=\"mainCanvas\"></canvas>\n" +
@@ -197,13 +206,12 @@ public class ServidorVisual {
             "          <div class=\"narration\">\n" +
             "            <span class=\"step-no\" id=\"step-counter\">0 / 0</span>\n" +
             "            <div style=\"width:100%;\">\n" +
-            "               <p id=\"narrative-text\" style=\"margin:0;\">Selecione um cenário acima e aperte Play.</p>\n" +
+            "               <p id=\"narrative-text\" style=\"margin:0;\">No pipeline, use os botões no topo da tela para escolher o cenário.</p>\n" +
             "            </div>\n" +
             "          </div>\n" +
             "        </section>\n" +
             "      </div>\n" +
             "\n" +
-            "      <!-- COLUNA DIREITA: LÓGICA E MÉTRICAS -->\n" +
             "      <div class=\"stage-col\">\n" +
             "        <section class=\"panel\">\n" +
             "          <div class=\"panel-head\"><h2 class=\"panel-title\">Pseudocódigo (MotorFraude.java)</h2></div>\n" +
@@ -224,7 +232,7 @@ public class ServidorVisual {
             "  </div>\n" +
             "\n" +
             "  <!-- BARRA DE TRANSPORTE -->\n" +
-            "  <div class=\"transport\">\n" +
+            "  <div class=\"transport\" id=\"barra-transporte\">\n" +
             "      <button class=\"tbtn\" onclick=\"resetCurrent()\" title=\"Resetar Cenário\">\n" +
             "        <svg viewBox=\"0 0 24 24\"><path d=\"M6 5h2.5v14H6zM20 5v14L9.5 12z\"/></svg>\n" +
             "      </button>\n" +
@@ -247,15 +255,17 @@ public class ServidorVisual {
             "    let isPlaying = false;\n" +
             "    let playInterval = null;\n" +
             "    let estadoArestas = [];\n" +
-            "    let estadoFluxo = {}; // Para gerenciar a aba pipeline\n" +
+            "    let estadoFluxo = {}; \n" +
+            "    let tipoFluxo = 'legitima'; \n" +
+            "    let isProcessing = false; \n" +
             "\n" +
             "    const codigos = {\n" +
             "      'fluxo': [\n" +
-            "         \"1. Transação criada (C10 -> C20)\",\n" +
+            "         \"1. tx = nova Transacao(origem, destino, valor)\",\n" +
             "         \"2. TreapContas.verificarSaldo(tx.origem, tx.valor)\",\n" +
             "         \"3. JanelaDeslizante.avaliarRisco(tx)\",\n" +
             "         \"4. GrafoTransacional.avaliarRisco(tx)\",\n" +
-            "         \"5. se (score < 50): efetivar_transferencia()\",\n" +
+            "         \"5. motor.processarTransacao(tx);\"\n" +
             "      ],\n" +
             "      'contas': [\n" +
             "         \"Treap.obterOuCriar(idConta):\",\n" +
@@ -298,50 +308,153 @@ public class ServidorVisual {
             "      ]\n" +
             "    };\n" +
             "\n" +
-            "    function mudarAba(aba, btn) {\n" +
-            "      document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));\n" +
-            "      btn.classList.add('active');\n" +
-            "      abaAtual = aba;\n" +
+            "    function pause() {\n" +
+            "       isPlaying = false;\n" +
+            "       if (playInterval) clearInterval(playInterval);\n" +
+            "       playInterval = null;\n" +
+            "       const icon = document.getElementById('icon-play');\n" +
+            "       if (icon) icon.innerHTML = '<path d=\"M7 4v16l13-8z\"/>';\n" +
+            "    }\n" +
+            "\n" +
+            "    async function mudarAba(aba, btn) {\n" +
+            "      try {\n" +
+            "          pause(); \n" +
+            "          document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));\n" +
+            "          if(btn) btn.classList.add('active');\n" +
+            "          abaAtual = aba;\n" +
+            "          \n" +
+            "          const divControles = document.getElementById('controles-fluxo');\n" +
+            "          const divBarra = document.getElementById('barra-transporte');\n" +
+            "          if(divControles) divControles.style.display = (aba === 'fluxo') ? 'flex' : 'none';\n" +
+            "          if(divBarra) divBarra.style.display = (aba === 'fluxo') ? 'none' : 'flex';\n" +
+            "\n" +
+            "          const mCanvas = document.getElementById('mainCanvas');\n" +
+            "          const mTable = document.getElementById('table-container');\n" +
+            "          \n" +
+            "          if(aba === 'contas') {\n" +
+            "             if(mCanvas) mCanvas.style.display = 'none';\n" +
+            "             if(mTable) mTable.style.display = 'block';\n" +
+            "             carregarTabela(aba);\n" +
+            "          } else {\n" +
+            "             if(mCanvas) mCanvas.style.display = 'block';\n" +
+            "             if(mTable) mTable.style.display = 'none';\n" +
+            "          }\n" +
+            "          await resetCurrent();\n" +
+            "      } catch(e) { console.error('Erro ao mudar aba:', e); }\n" +
+            "    }\n" +
+            "\n" +
+            "    async function iniciarFluxo(tipo) {\n" +
+            "        try {\n" +
+            "            if (isProcessing) return;\n" +
+            "            pause(); \n" +
+            "            tipoFluxo = tipo;\n" +
+            "            await resetCurrent();\n" +
+            "            if (abaAtual !== 'fluxo') return; \n" +
+            "            \n" +
+            "            isPlaying = true;\n" +
+            "            document.getElementById('icon-play').innerHTML = '<path d=\"M6 4h4v16H6zM14 4h4v16h-4z\"/>';\n" +
+            "            await nextStep(); \n" +
+            "            playInterval = setInterval(nextStep, 2000);\n" +
+            "        } catch(e) { console.error(e); }\n" +
+            "    }\n" +
+            "\n" +
+            "    async function togglePlay() {\n" +
+            "       try {\n" +
+            "           if (isPlaying) {\n" +
+            "              pause();\n" +
+            "           } else {\n" +
+            "              pause(); \n" +
+            "              isPlaying = true;\n" +
+            "              document.getElementById('icon-play').innerHTML = '<path d=\"M6 4h4v16H6zM14 4h4v16h-4z\"/>';\n" +
+            "              await nextStep();\n" +
+            "              playInterval = setInterval(nextStep, 2000);\n" +
+            "           }\n" +
+            "       } catch(e) { console.error(e); }\n" +
+            "    }\n" +
+            "\n" +
+            "    async function nextStep() {\n" +
+            "      if (abaAtual === 'contas') return;\n" +
+            "      if (isProcessing) return; \n" +
+            "      isProcessing = true;\n" +
+            "      \n" +
+            "      try {\n" +
+            "          let data;\n" +
+            "          if (abaAtual === 'fluxo') {\n" +
+            "              const res = await fetch(`/api/fluxo/passo?tipo=${tipoFluxo}`);\n" +
+            "              if (!res.ok) throw new Error('Falha API Fluxo');\n" +
+            "              data = await res.json();\n" +
+            "              estadoFluxo = data;\n" +
+            "              desenharGrafoAtual();\n" +
+            "              \n" +
+            "              let colorClass = '';\n" +
+            "              if(data.statusAtual === 'APROVADA') colorClass = 'success';\n" +
+            "              if(data.statusAtual === 'SUSPEITA') colorClass = 'warning';\n" +
+            "              if(data.statusAtual === 'BLOQUEADA') colorClass = 'danger';\n" +
+            "              \n" +
+            "              document.getElementById('m-score').innerText = data.scoreAtual.toFixed(1);\n" +
+            "              document.getElementById('m-score').className = `v ${colorClass}`;\n" +
+            "              document.getElementById('m-status').innerText = data.statusAtual;\n" +
+            "              document.getElementById('m-status').className = `v ${colorClass}`;\n" +
+            "              document.getElementById('m-extra').innerText = data.infoExtra;\n" +
+            "              document.getElementById('step-counter').innerText = `Passo ${data.passoAtual} / 5`;\n" +
+            "              document.getElementById('narrative-text').innerHTML = `<code>${tipoFluxo === 'legitima'?'Transação Normal':'Fraude (Ciclo)'}</code>: <br><span style=\"color:var(--ink-2); font-size:13px;\">${data.mensagem}</span>`;\n" +
+            "              atualizarPseudocodigo('fluxo', data.linhaCodigo);\n" +
+            "              if(data.proximoPassoTexto.includes('Concluido')) pause(); \n" +
+            "          } else {\n" +
+            "              const res = await fetch(`/api/${abaAtual}/passo`);\n" +
+            "              if (!res.ok) throw new Error('Falha API Grafo');\n" +
+            "              data = await res.json();\n" +
+            "              estadoArestas = data.arestas || [];\n" +
+            "              desenharGrafoAtual();\n" +
+            "              \n" +
+            "              if (data.ultimaTransacao) {\n" +
+            "                  const tx = data.ultimaTransacao;\n" +
+            "                  let classCss = 'success';\n" +
+            "                  if(tx.status === 'SUSPEITA') classCss = 'warning';\n" +
+            "                  if(tx.status === 'BLOQUEADA') classCss = 'danger';\n" +
+            "                  \n" +
+            "                  document.getElementById('m-score').innerText = tx.score.toFixed(1);\n" +
+            "                  document.getElementById('m-score').className = `v ${classCss}`;\n" +
+            "                  document.getElementById('m-status').innerText = tx.status;\n" +
+            "                  document.getElementById('m-status').className = `v ${classCss}`;\n" +
+            "                  document.getElementById('step-counter').innerText = `Passo ${data.passoAtual} / 5`;\n" +
+            "                  document.getElementById('narrative-text').innerHTML = `<code>Tx #${tx.id}</code>: C${tx.origem} -> C${tx.destino} (R$ ${(tx.valor/100).toFixed(2)})<br><span style=\"color:var(--ink-2); font-size:13px;\">${tx.motivo}</span>`;\n" +
+            "                  \n" +
+            "                  if(abaAtual === 'smurfing') { document.getElementById('m-extra').innerText = `${data.bufferQtd} txs na Janela`; atualizarPseudocodigo(abaAtual, tx.status==='SUSPEITA'?4:2); }\n" +
+            "                  if(abaAtual === 'ciclo') { document.getElementById('m-extra').innerText = `${data.passoAtual} vértices (DFS)`; atualizarPseudocodigo(abaAtual, tx.status==='BLOQUEADA'?1:5); }\n" +
+            "                  if(abaAtual === 'fanin') { document.getElementById('m-extra').innerText = `In-Degree: ${data.inDegree}`; atualizarPseudocodigo(abaAtual, 2); }\n" +
+            "                  if(abaAtual === 'burst') { document.getElementById('m-extra').innerText = `${data.velocidadePorMinuto} tx/min`; atualizarPseudocodigo(abaAtual, 4); }\n" +
+            "              }\n" +
+            "              if(data.proximoPassoTexto && data.proximoPassoTexto.includes('Concluido')) pause(); \n" +
+            "          }\n" +
+            "      } catch (e) {\n" +
+            "          console.error(\"Erro no processamento da API:\", e);\n" +
+            "          pause();\n" +
+            "      } finally {\n" +
+            "          isProcessing = false;\n" +
+            "      }\n" +
+            "    }\n" +
+            "\n" +
+            "    async function resetCurrent() {\n" +
+            "      if (abaAtual === 'contas') return;\n" +
+            "      try {\n" +
+            "          await fetch(`/api/${abaAtual}/reset`);\n" +
+            "      } catch (e) { console.error(\"Erro ao resetar:\", e); }\n" +
+            "      \n" +
             "      estadoArestas = [];\n" +
             "      estadoFluxo = {};\n" +
-            "      atualizarPseudocodigo(aba, -1);\n" +
             "      \n" +
-            "      if(aba === 'contas' || aba === 'merkle') {\n" +
-            "         document.getElementById('mainCanvas').style.display = 'none';\n" +
-            "         document.getElementById('table-container').style.display = 'block';\n" +
-            "         carregarTabela(aba);\n" +
-            "      } else {\n" +
-            "         document.getElementById('mainCanvas').style.display = 'block';\n" +
-            "         document.getElementById('table-container').style.display = 'none';\n" +
-            "         desenharGrafoAtual();\n" +
-            "      }\n" +
-            "      if (isPlaying) togglePlay();\n" +
-            "      resetCurrent();\n" +
+            "      const setEl = (id, txt, cls) => { const e = document.getElementById(id); if(e){ e.innerText = txt; if(cls !== undefined) e.className = cls; } };\n" +
+            "      setEl('m-score', '0.0', 'v');\n" +
+            "      setEl('m-status', '-', 'v');\n" +
+            "      setEl('m-extra', '-');\n" +
+            "      setEl('step-counter', '0 / 0');\n" +
+            "      setEl('narrative-text', 'Aperte Play para analisar os dados em memória.');\n" +
+            "      \n" +
+            "      atualizarPseudocodigo(abaAtual, -1);\n" +
+            "      desenharGrafoAtual();\n" +
             "    }\n" +
             "\n" +
-            "    function atualizarPseudocodigo(aba, linhaDestaque) {\n" +
-            "      const box = document.getElementById('pseudocode-box');\n" +
-            "      let h = '';\n" +
-            "      codigos[aba].forEach((linha, i) => {\n" +
-            "        const active = (i === linhaDestaque) ? 'active' : '';\n" +
-            "        h += `<div class=\"code-line ${active}\"><span class=\"ln\">${i+1}</span><span>${linha}</span></div>`;\n" +
-            "      });\n" +
-            "      box.innerHTML = h;\n" +
-            "    }\n" +
-            "\n" +
-            "    async function carregarTabela(tipo) {\n" +
-            "      const title = document.getElementById('stage-title');\n" +
-            "      const tbl = document.getElementById('table-container');\n" +
-            "      if (tipo === 'contas') {\n" +
-            "        title.innerText = 'Treap: Tabela de Contas (O(log N))';\n" +
-            "        const res = await fetch('/api/contas/todas'); const data = await res.json();\n" +
-            "        let h = `<table><tr><th>ID Conta</th><th>Saldo (R$)</th><th>Score</th></tr>`;\n" +
-            "        data.forEach(c => { h += `<tr><td><strong>#${c.id}</strong></td><td>${(c.saldo/100).toFixed(2)}</td><td style=\"color:${c.scoreRisco>50?'var(--swap)':'var(--done)'}\">${c.scoreRisco.toFixed(1)}</td></tr>`; });\n" +
-            "        tbl.innerHTML = h + `</table>`;\n" +
-            "      }\n" +
-            "    }\n" +
-            "\n" +
-            "    // --- ENGINE DO CANVAS --- \n" +
             "    function getCSSVar(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }\n" +
             "    \n" +
             "    function desenharSeta(ctx, fromX, fromY, toX, toY, cor) {\n" +
@@ -353,41 +466,40 @@ public class ServidorVisual {
             "    }\n" +
             "\n" +
             "    function desenharGrafoAtual() {\n" +
-            "        if(abaAtual === 'contas' || abaAtual === 'merkle') return;\n" +
-            "        const canvas = document.getElementById('mainCanvas'); const ctx = canvas.getContext('2d');\n" +
-            "        canvas.width = canvas.clientWidth; canvas.height = canvas.clientHeight;\n" +
-            "        ctx.clearRect(0, 0, canvas.width, canvas.height);\n" +
+            "        if(abaAtual === 'contas') return;\n" +
+            "        const canvas = document.getElementById('mainCanvas');\n" +
+            "        if (!canvas) return;\n" +
+            "        const ctx = canvas.getContext('2d');\n" +
+            "        const cw = canvas.clientWidth || 800; const ch = canvas.clientHeight || 360;\n" +
+            "        canvas.width = cw; canvas.height = ch;\n" +
+            "        ctx.clearRect(0, 0, cw, ch);\n" +
             "\n" +
-            "        // ----------- ABA FLUXO (PIPELINE) -----------\n" +
             "        if (abaAtual === 'fluxo') {\n" +
             "            document.getElementById('stage-title').innerText = 'Ciclo de Vida da Transação';\n" +
             "            const cAtivo = getCSSVar('--accent');\n" +
             "            const cInativo = getCSSVar('--surface');\n" +
             "            const nodes = [\n" +
-            "                { id: 'origem', x: canvas.width * 0.1, y: canvas.height / 2, tipo: 'circle', label: 'Origem' },\n" +
-            "                { id: 'treap', x: canvas.width * 0.3, y: canvas.height / 2, tipo: 'rect', label: 'Treap (Saldo)' },\n" +
-            "                { id: 'janela', x: canvas.width * 0.5, y: canvas.height / 2, tipo: 'rect', label: 'Janela (Burst)' },\n" +
-            "                { id: 'grafo', x: canvas.width * 0.7, y: canvas.height / 2, tipo: 'rect', label: 'Grafo (Lavagem)' },\n" +
-            "                { id: 'destino', x: canvas.width * 0.9, y: canvas.height / 2, tipo: 'circle', label: 'Destino' }\n" +
+            "                { id: 'origem', x: cw * 0.1, y: ch / 2, tipo: 'circle', label: 'Origem' },\n" +
+            "                { id: 'treap', x: cw * 0.3, y: ch / 2, tipo: 'rect', label: 'Treap (Saldo)' },\n" +
+            "                { id: 'janela', x: cw * 0.5, y: ch / 2, tipo: 'rect', label: 'Janela' },\n" +
+            "                { id: 'grafo', x: cw * 0.7, y: ch / 2, tipo: 'rect', label: 'Grafo' },\n" +
+            "                { id: 'destino', x: cw * 0.9, y: ch / 2, tipo: 'circle', label: 'Destino' }\n" +
             "            ];\n" +
             "\n" +
-            "            // Desenhar setas conectando os módulos\n" +
             "            for (let i = 0; i < nodes.length - 1; i++) {\n" +
             "                let xOrig = nodes[i].x + (nodes[i].tipo === 'rect' ? 45 : 25);\n" +
             "                let xDest = nodes[i+1].x - (nodes[i+1].tipo === 'rect' ? 45 : 25);\n" +
             "                desenharSeta(ctx, xOrig, nodes[i].y, xDest, nodes[i+1].y, getCSSVar('--line-soft'));\n" +
             "            }\n" +
             "\n" +
-            "            // Pintar os blocos baseados no passo atual\n" +
             "            const ativoIdx = (estadoFluxo && estadoFluxo.nodeAtivo !== undefined) ? estadoFluxo.nodeAtivo : -1;\n" +
             "            nodes.forEach((n, i) => {\n" +
             "                ctx.beginPath();\n" +
-            "                // Se o pipeline acabou (ativo = 4), pinta o destino de verde. Senão, pinta o passo de azul.\n" +
             "                if (i === ativoIdx) {\n" +
-            "                     ctx.fillStyle = (i === 4) ? getCSSVar('--done') : cAtivo;\n" +
-            "                } else {\n" +
-            "                     ctx.fillStyle = cInativo;\n" +
-            "                }\n" +
+            "                     if (i === 4) ctx.fillStyle = (estadoFluxo.statusAtual === 'BLOQUEADA') ? getCSSVar('--swap') : getCSSVar('--done');\n" +
+            "                     else if (i === 3 && estadoFluxo.statusAtual === 'SUSPEITA') ctx.fillStyle = getCSSVar('--compare');\n" +
+            "                     else ctx.fillStyle = cAtivo;\n" +
+            "                } else { ctx.fillStyle = cInativo; }\n" +
             "\n" +
             "                if (n.tipo === 'circle') ctx.arc(n.x, n.y, 28, 0, 2 * Math.PI);\n" +
             "                else ctx.rect(n.x - 45, n.y - 25, 90, 50);\n" +
@@ -397,36 +509,37 @@ public class ServidorVisual {
             "                ctx.font = 'bold 11px \"IBM Plex Mono\"'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';\n" +
             "                ctx.fillText(n.label, n.x, n.y);\n" +
             "            });\n" +
-            "            return;\n" +
+            "            return; \n" +
             "        }\n" +
             "\n" +
-            "        // ----------- ABAS DE GRAFOS ESPECÍFICOS -----------\n" +
             "        let pos = {};\n" +
             "        if (abaAtual === 'smurfing') {\n" +
             "            document.getElementById('stage-title').innerText = 'Grafo: 15 -> 40 (Pulverização)';\n" +
-            "            pos = { 15: {x: canvas.width*0.2, y: canvas.height/2}, 40: {x: canvas.width*0.8, y: canvas.height/2} };\n" +
+            "            pos = { 15: {x: cw*0.2, y: ch/2}, 40: {x: cw*0.8, y: ch/2} };\n" +
             "        } else if (abaAtual === 'ciclo') {\n" +
             "            document.getElementById('stage-title').innerText = 'Grafo: Anel 20 -> 30 -> 40 -> 20';\n" +
-            "            pos = { 20: {x: canvas.width/2, y: canvas.height*0.2}, 30: {x: canvas.width*0.8, y: canvas.height*0.7}, 40: {x: canvas.width*0.2, y: canvas.height*0.7} };\n" +
+            "            pos = { 20: {x: cw/2, y: ch*0.2}, 30: {x: cw*0.8, y: ch*0.7}, 40: {x: cw*0.2, y: ch*0.7} };\n" +
             "        } else if (abaAtual === 'fanin') {\n" +
             "            document.getElementById('stage-title').innerText = 'Grafo: Fan-In na Conta 80';\n" +
-            "            pos = { 10: {x: canvas.width*0.1, y: canvas.height*0.1}, 15: {x: canvas.width*0.1, y: canvas.height*0.3}, 20: {x: canvas.width*0.1, y: canvas.height*0.5}, 25: {x: canvas.width*0.1, y: canvas.height*0.7}, 30: {x: canvas.width*0.1, y: canvas.height*0.9}, 80: {x: canvas.width*0.8, y: canvas.height/2} };\n" +
+            "            pos = { 10: {x: cw*0.1, y: ch*0.1}, 15: {x: cw*0.1, y: ch*0.3}, 20: {x: cw*0.1, y: ch*0.5}, 25: {x: cw*0.1, y: ch*0.7}, 30: {x: cw*0.1, y: ch*0.9}, 80: {x: cw*0.8, y: ch/2} };\n" +
             "        } else if (abaAtual === 'burst') {\n" +
             "            document.getElementById('stage-title').innerText = 'Grafo: Explosão Radial da Conta 25';\n" +
-            "            pos = { 25: {x: canvas.width/2, y: canvas.height/2}, 50: {x: canvas.width*0.2, y: canvas.height*0.2}, 60: {x: canvas.width*0.8, y: canvas.height*0.2}, 70: {x: canvas.width*0.8, y: canvas.height*0.8}, 80: {x: canvas.width*0.2, y: canvas.height*0.8}, 10: {x: canvas.width/2, y: canvas.height*0.1} };\n" +
+            "            pos = { 25: {x: cw/2, y: ch/2}, 50: {x: cw*0.2, y: ch*0.2}, 60: {x: cw*0.8, y: ch*0.2}, 70: {x: cw*0.8, y: ch*0.8}, 80: {x: cw*0.2, y: ch*0.8}, 10: {x: cw/2, y: ch*0.1} };\n" +
             "        }\n" +
             "        \n" +
             "        const cText = getCSSVar('--ink'); const cSurf = getCSSVar('--surface-2');\n" +
             "        const cDone = getCSSVar('--done'); const cWarn = getCSSVar('--compare'); const cAlert = getCSSVar('--swap');\n" +
             "\n" +
-            "        estadoArestas.forEach(a => {\n" +
-            "            if (pos[a.origem] && pos[a.destino]) {\n" +
-            "                let corSeta = cDone;\n" +
-            "                if(a.status === 'SUSPEITA') corSeta = cWarn;\n" +
-            "                if(a.status === 'BLOQUEADA') corSeta = cAlert;\n" +
-            "                desenharSeta(ctx, pos[a.origem].x, pos[a.origem].y, pos[a.destino].x, pos[a.destino].y, corSeta);\n" +
-            "            }\n" +
-            "        });\n" +
+            "        if (estadoArestas && estadoArestas.length > 0) {\n" +
+            "            estadoArestas.forEach(a => {\n" +
+            "                if (pos[a.origem] && pos[a.destino]) {\n" +
+            "                    let corSeta = cDone;\n" +
+            "                    if(a.status === 'SUSPEITA') corSeta = cWarn;\n" +
+            "                    if(a.status === 'BLOQUEADA') corSeta = cAlert;\n" +
+            "                    desenharSeta(ctx, pos[a.origem].x, pos[a.origem].y, pos[a.destino].x, pos[a.destino].y, corSeta);\n" +
+            "                }\n" +
+            "            });\n" +
+            "        }\n" +
             "\n" +
             "        Object.keys(pos).forEach(id => {\n" +
             "            const p = pos[id];\n" +
@@ -435,86 +548,32 @@ public class ServidorVisual {
             "        });\n" +
             "    }\n" +
             "\n" +
-            "    // --- PLAYER DE PASSOS (API) --- \n" +
-            "    async function nextStep() {\n" +
-            "      if (abaAtual === 'contas' || abaAtual === 'merkle') return;\n" +
-            "      \n" +
-            "      // Tratamento especial para o Pipeline de Fluxo\n" +
-            "      if (abaAtual === 'fluxo') {\n" +
-            "          const res = await fetch(`/api/fluxo/passo`);\n" +
-            "          const data = await res.json();\n" +
-            "          estadoFluxo = data;\n" +
-            "          desenharGrafoAtual();\n" +
-            "          \n" +
-            "          document.getElementById('m-score').innerText = data.scoreAtual.toFixed(1);\n" +
-            "          document.getElementById('m-score').className = `v ${data.statusAtual === 'APROVADA' ? 'success' : ''}`;\n" +
-            "          document.getElementById('m-status').innerText = data.statusAtual;\n" +
-            "          document.getElementById('m-status').className = `v ${data.statusAtual === 'APROVADA' ? 'success' : ''}`;\n" +
-            "          document.getElementById('m-extra').innerText = data.infoExtra;\n" +
-            "          document.getElementById('step-counter').innerText = `Passo ${data.passoAtual} / 5`;\n" +
-            "          document.getElementById('narrative-text').innerHTML = `<code>Pipeline</code>: <br><span style=\"color:var(--ink-2); font-size:13px;\">${data.mensagem}</span>`;\n" +
-            "          atualizarPseudocodigo('fluxo', data.linhaCodigo);\n" +
-            "          \n" +
-            "          if(data.proximoPassoTexto.includes('Concluido')) pause();\n" +
-            "          return;\n" +
-            "      }\n" +
-            "\n" +
-            "      // Tratamento pros grafos (Smurfing, Ciclos, etc)\n" +
-            "      const res = await fetch(`/api/${abaAtual}/passo`);\n" +
-            "      const data = await res.json();\n" +
-            "      estadoArestas = data.arestas;\n" +
-            "      desenharGrafoAtual();\n" +
-            "      \n" +
-            "      const tx = data.ultimaTransacao;\n" +
-            "      let classCss = 'success';\n" +
-            "      if(tx.status === 'SUSPEITA') classCss = 'warning';\n" +
-            "      if(tx.status === 'BLOQUEADA') classCss = 'danger';\n" +
-            "      \n" +
-            "      document.getElementById('m-score').innerText = tx.score.toFixed(1);\n" +
-            "      document.getElementById('m-score').className = `v ${classCss}`;\n" +
-            "      document.getElementById('m-status').innerText = tx.status;\n" +
-            "      document.getElementById('m-status').className = `v ${classCss}`;\n" +
-            "      document.getElementById('step-counter').innerText = `Passo ${data.passoAtual} / 5`;\n" +
-            "      document.getElementById('narrative-text').innerHTML = `<code>Tx #${tx.id}</code>: C${tx.origem} -> C${tx.destino} (R$ ${(tx.valor/100).toFixed(2)})<br><span style=\"color:var(--ink-2); font-size:13px;\">${tx.motivo}</span>`;\n" +
-            "      \n" +
-            "      if(abaAtual === 'smurfing') { document.getElementById('m-extra').innerText = `${data.bufferQtd} txs na Janela`; atualizarPseudocodigo(abaAtual, tx.status==='SUSPEITA'?4:2); }\n" +
-            "      if(abaAtual === 'ciclo') { document.getElementById('m-extra').innerText = `${data.passoAtual} vértices (DFS)`; atualizarPseudocodigo(abaAtual, tx.status==='BLOQUEADA'?1:5); }\n" +
-            "      if(abaAtual === 'fanin') { document.getElementById('m-extra').innerText = `In-Degree: ${data.inDegree}`; atualizarPseudocodigo(abaAtual, 2); }\n" +
-            "      if(abaAtual === 'burst') { document.getElementById('m-extra').innerText = `${data.velocidadePorMinuto} tx/min`; atualizarPseudocodigo(abaAtual, 4); }\n" +
-            "\n" +
-            "      if(data.proximoPassoTexto.includes('Concluido')) pause();\n" +
-            "    }\n" +
-            "\n" +
-            "    async function resetCurrent() {\n" +
-            "      if (abaAtual !== 'contas' && abaAtual !== 'merkle') {\n" +
-            "          await fetch(`/api/${abaAtual}/reset`);\n" +
-            "          estadoArestas = [];\n" +
-            "          estadoFluxo = {};\n" +
-            "          document.getElementById('m-score').innerText = '0.0';\n" +
-            "          document.getElementById('m-score').className = `v`;\n" +
-            "          document.getElementById('m-status').innerText = '-';\n" +
-            "          document.getElementById('m-status').className = `v`;\n" +
-            "          document.getElementById('m-extra').innerText = '-';\n" +
-            "          document.getElementById('step-counter').innerText = `0 / 0`;\n" +
-            "          document.getElementById('narrative-text').innerText = 'Aperte Play para analisar os dados em memória.';\n" +
-            "          atualizarPseudocodigo(abaAtual, -1);\n" +
-            "          desenharGrafoAtual();\n" +
+            "    async function carregarTabela(tipo) {\n" +
+            "      const title = document.getElementById('stage-title');\n" +
+            "      const tbl = document.getElementById('table-container');\n" +
+            "      if (tipo === 'contas') {\n" +
+            "        title.innerText = 'Treap: Tabela de Contas (O(log N))';\n" +
+            "        try {\n" +
+            "            const res = await fetch('/api/contas/todas'); \n" +
+            "            if(!res.ok) throw new Error('Falha HTTP');\n" +
+            "            const data = await res.json();\n" +
+            "            let h = `<table><tr><th>ID Conta</th><th>Saldo (R$)</th><th>Score</th></tr>`;\n" +
+            "            data.forEach(c => { h += `<tr><td><strong>#${c.id}</strong></td><td>${(c.saldo/100).toFixed(2)}</td><td style=\"color:${c.scoreRisco>50?'var(--swap)':'var(--done)'}\">${c.scoreRisco.toFixed(1)}</td></tr>`; });\n" +
+            "            tbl.innerHTML = h + `</table>`;\n" +
+            "        } catch(e) { tbl.innerHTML = 'Erro ao carregar os dados. Verifique o servidor.'; console.error(e); }\n" +
             "      }\n" +
             "    }\n" +
             "\n" +
-            "    function togglePlay() {\n" +
-            "       if (isPlaying) pause();\n" +
-            "       else {\n" +
-            "          isPlaying = true;\n" +
-            "          document.getElementById('icon-play').innerHTML = '<path d=\"M6 4h4v16H6zM14 4h4v16h-4z\"/>';\n" +
-            "          playInterval = setInterval(nextStep, 2000);\n" +
-            "       }\n" +
-            "    }\n" +
-            "\n" +
-            "    function pause() {\n" +
-            "       isPlaying = false;\n" +
-            "       clearInterval(playInterval);\n" +
-            "       document.getElementById('icon-play').innerHTML = '<path d=\"M7 4v16l13-8z\"/>';\n" +
+            "    function atualizarPseudocodigo(aba, linhaDestaque) {\n" +
+            "      const box = document.getElementById('pseudocode-box');\n" +
+            "      let h = '';\n" +
+            "      if(codigos[aba]) {\n" +
+            "          codigos[aba].forEach((linha, i) => {\n" +
+            "            const active = (i === linhaDestaque) ? 'active' : '';\n" +
+            "            h += `<div class=\"code-line ${active}\"><span class=\"ln\">${i+1}</span><span>${linha}</span></div>`;\n" +
+            "          });\n" +
+            "      }\n" +
+            "      box.innerHTML = h;\n" +
             "    }\n" +
             "\n" +
             "    window.onload = () => { mudarAba('fluxo', document.querySelector('.chip')); };\n" +
@@ -524,6 +583,9 @@ public class ServidorVisual {
 
             byte[] bytes = html.getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().set("Content-Type", "text/html; charset=UTF-8");
+            exchange.getResponseHeaders().set("Cache-Control", "no-cache, no-store, must-revalidate");
+            exchange.getResponseHeaders().set("Pragma", "no-cache");
+            exchange.getResponseHeaders().set("Expires", "0");
             exchange.sendResponseHeaders(200, bytes.length);
             OutputStream os = exchange.getResponseBody();
             os.write(bytes);
@@ -532,12 +594,15 @@ public class ServidorVisual {
     }
 
     // =========================================================================
-    // NOVO HANDLER: PIPELINE (FLUXO COMPLETO DA TRANSAÇÃO)
+    // API FLUXO COMPLETO DA TRANSAÇÃO (OPÇÕES: LEGÍTIMA OU FRAUDE)
     // =========================================================================
     static class FluxoPassoHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
-            passoFluxoAtual++;
+            String query = exchange.getRequestURI().getQuery();
+            boolean isFraude = query != null && query.contains("tipo=fraude");
+            
+            if (passoFluxoAtual < 5) passoFluxoAtual++;
             
             int nodeAtivo = -1;
             int linhaCodigo = 0;
@@ -545,43 +610,70 @@ public class ServidorVisual {
             String statusAtual = "PROCESSANDO";
             String mensagem = "";
             String infoExtra = "-";
-            String proximoPassoTexto = "Passo " + (passoFluxoAtual + 1) + " de 5";
+            String proximoPassoTexto = "Passo " + (passoFluxoAtual) + " de 5";
             
             Conta c10 = motor.getTreapContas().obterOuCriar(10, 100_000_00L, 2_000_00L);
             
             if (passoFluxoAtual == 1) {
-                nodeAtivo = 0; // Bolinha Origem
+                nodeAtivo = 0;
                 linhaCodigo = 0;
-                mensagem = "Transação iniciada na rede. Origem: C10, Destino: C20. Valor R$ 500,00.";
+                mensagem = isFraude ? "Iniciada tentativa de Lavagem (C10 -> C20) de R$ 48.000,00." : "Transação comum iniciada (C10 -> C20) de R$ 500,00.";
             } else if (passoFluxoAtual == 2) {
-                nodeAtivo = 1; // Retângulo Treap
+                nodeAtivo = 1;
                 linhaCodigo = 1;
-                mensagem = "Motor consultou a Treap em O(log N). Saldo disponível confirmado (R$ " + (c10.getSaldoCentavos()/100.0) + "). O lock na conta foi aplicado.";
+                mensagem = "Consulta rápida na Treap (Tempo O(log N)). Saldo de R$ " + (c10.getSaldoCentavos()/100.0) + " é suficiente. Conta isolada com Lock temporário.";
                 infoExtra = "Saldo Validado";
             } else if (passoFluxoAtual == 3) {
-                nodeAtivo = 2; // Retângulo Janela
+                nodeAtivo = 2;
                 linhaCodigo = 2;
-                mensagem = "Análise da Janela Deslizante via Busca Binária. Frequência normal. Nenhum Smurfing ou Velocity Burst detectado nos últimos 10 min.";
+                mensagem = "Varredura na Janela Deslizante (últimos 10 min). Nenhuma atividade anormal de frequência ou pulverização detectada.";
                 infoExtra = "Buffer Limpo";
             } else if (passoFluxoAtual == 4) {
-                nodeAtivo = 3; // Retângulo Grafo
+                nodeAtivo = 3;
                 linhaCodigo = 3;
-                mensagem = "Grafo Transacional (DFS Limitada). Analisando vizinhança. Nenhum anel de lavagem (Ciclos) ou concentração atípica (Fan-in) identificados.";
-                infoExtra = "Grau Entrada: 0";
+                if (isFraude) {
+                    scoreAtual = 100.0;
+                    statusAtual = "SUSPEITA";
+                    mensagem = "Motor acionou a Busca DFS no Grafo e identificou conexão com histórico criminoso recente. A transação fecha um anel de lavagem de dinheiro!";
+                    infoExtra = "Ciclo Detectado";
+                } else {
+                    mensagem = "Busca no Grafo Transacional não encontrou anéis de lavagem ou padrão de contas laranjas (Fan-in). Vizinhança limpa.";
+                    infoExtra = "Vizinhança Limpa";
+                }
             } else {
-                nodeAtivo = 4; // Bolinha Destino (Fim)
+                nodeAtivo = 4;
                 linhaCodigo = 4;
-                mensagem = "Score final calculado: 0.0. Transação totalmente APROVADA. Saldos atualizados em memória e bloco enviado para criptografia Merkle.";
-                statusAtual = "APROVADA";
-                infoExtra = "R$ 500 transferidos";
                 proximoPassoTexto = "Concluido (Resetar)";
                 
-                // Processa a transação real no backend para manter a coerência
-                timestampAtual += 1000L;
-                Transacao tx = new Transacao(contadorId++, 10, 20, 500_00L, timestampAtual);
-                motor.processarTransacao(tx);
-                historicoDecisoes.add(tx);
-                checarSelagemMerkle();
+                if (historicoDecisoes.size() == 0 || historicoDecisoes.get(historicoDecisoes.size() -1).getIdContaOrigem() != 10) {
+                    if (isFraude) {
+                        timestampAtual += 1000L;
+                        motor.processarTransacao(new Transacao(contadorId++, 20, 30, 480_000_00L, timestampAtual));
+                        motor.processarTransacao(new Transacao(contadorId++, 30, 40, 480_000_00L, timestampAtual + 1000));
+                        motor.processarTransacao(new Transacao(contadorId++, 40, 10, 480_000_00L, timestampAtual + 2000));
+                        
+                        Transacao txFraude = new Transacao(contadorId++, 10, 20, 480_000_00L, timestampAtual + 3000);
+                        motor.processarTransacao(txFraude);
+                        historicoDecisoes.add(txFraude);
+                    } else {
+                        timestampAtual += 1000L;
+                        Transacao txLegitima = new Transacao(contadorId++, 10, 20, 500_00L, timestampAtual);
+                        motor.processarTransacao(txLegitima);
+                        historicoDecisoes.add(txLegitima);
+                    }
+                    checarSelagemMerkle();
+                }
+
+                Transacao tx = historicoDecisoes.get(historicoDecisoes.size() - 1);
+                scoreAtual = tx.getScoreFraude();
+                statusAtual = tx.getStatus().name();
+                if (isFraude) {
+                    mensagem = "Transação <b>BLOQUEADA</b> pelo Motor de Fraude. Transferência desfeita e alerta enviado para a base. (Status Real: " + statusAtual + ")";
+                    infoExtra = "Retido R$ 48 mil";
+                } else {
+                    mensagem = "Score Seguro. Transação <b>APROVADA</b> pelo Motor de Fraude. Saldo debitado e Bloco enviado para registro Merkle. (Status Real: " + statusAtual + ")";
+                    infoExtra = "Transferido R$ 500";
+                }
             }
 
             StringBuilder json = new StringBuilder();
@@ -598,20 +690,7 @@ public class ServidorVisual {
 
             byte[] bytes = json.toString().getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().set("Content-Type", "application/json; charset=UTF-8");
-            exchange.sendResponseHeaders(200, bytes.length);
-            OutputStream os = exchange.getResponseBody();
-            os.write(bytes);
-            os.close();
-        }
-    }
-    
-    static class FluxoResetHandler implements HttpHandler {
-        @Override
-        public void handle(HttpExchange exchange) throws IOException {
-            passoFluxoAtual = 0;
-            String json = "{\"status\":\"ok\"}";
-            byte[] bytes = json.getBytes(StandardCharsets.UTF_8);
-            exchange.getResponseHeaders().set("Content-Type", "application/json; charset=UTF-8");
+            exchange.getResponseHeaders().set("Cache-Control", "no-cache, no-store, must-revalidate");
             exchange.sendResponseHeaders(200, bytes.length);
             OutputStream os = exchange.getResponseBody();
             os.write(bytes);
@@ -619,6 +698,23 @@ public class ServidorVisual {
         }
     }
 
+    // =========================================================================
+    // API GENÉRICA DE RESET (USADA POR TODAS AS ABAS)
+    // =========================================================================
+    static class ResetGeralHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            reiniciarSistema();
+            String json = "{\"status\":\"ok\"}";
+            byte[] bytes = json.getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set("Content-Type", "application/json; charset=UTF-8");
+            exchange.getResponseHeaders().set("Cache-Control", "no-cache, no-store, must-revalidate");
+            exchange.sendResponseHeaders(200, bytes.length);
+            OutputStream os = exchange.getResponseBody();
+            os.write(bytes);
+            os.close();
+        }
+    }
 
     // =========================================================================
     // HANDLERS CASO 1: SMURFING COM AUDITORIA NUMÉRICA
@@ -626,19 +722,22 @@ public class ServidorVisual {
     static class SmurfingPassoHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
+            if (passoSmurfingAtual < 5) passoSmurfingAtual++;
+            
             Conta conta15 = motor.getTreapContas().obterOuCriar(15, 100_000_00L, 2_000_00L);
             long saldoAnterior = conta15.getSaldoCentavos();
-
-            passoSmurfingAtual++;
             timestampAtual += 15_000L;
 
-            Transacao tx = new Transacao(contadorId++, 15, 40, 9_600_00L, timestampAtual);
-            motor.processarTransacao(tx);
-            historicoDecisoes.add(tx);
-            checarSelagemMerkle();
+            if (historicoDecisoes.size() < passoSmurfingAtual) {
+                Transacao tx = new Transacao(contadorId++, 15, 40, 9_600_00L, timestampAtual);
+                motor.processarTransacao(tx);
+                historicoDecisoes.add(tx);
+                checarSelagemMerkle();
+            }
 
             MetricasJanela metricas = motor.getJanelaDeslizante().avaliarAtividadeConta(15, 10 * 60 * 1000L, timestampAtual);
-            String proximoTxt = (passoSmurfingAtual < 5) ? ("Passo " + (passoSmurfingAtual + 1) + " de 5") : "Smurfing Concluido (Resetar)";
+            String proximoTxt = (passoSmurfingAtual < 5) ? ("Passo " + (passoSmurfingAtual) + " de 5") : "Smurfing Concluido (Resetar)";
+            Transacao txExibir = historicoDecisoes.get(historicoDecisoes.size() - 1);
 
             StringBuilder json = new StringBuilder();
             json.append("{");
@@ -649,34 +748,20 @@ public class ServidorVisual {
             json.append("\"bufferQtd\":").append(metricas.getQtdTransacoes()).append(",");
             json.append("\"bufferValor\":").append(metricas.getValorTotalCentavos()).append(",");
             json.append("\"ultimaTransacao\":{")
-                .append("\"id\":").append(tx.getId()).append(",")
-                .append("\"origem\":").append(tx.getIdContaOrigem()).append(",")
-                .append("\"destino\":").append(tx.getIdContaDestino()).append(",")
-                .append("\"valor\":").append(tx.getValorCentavos()).append(",")
-                .append("\"score\":").append(String.format(Locale.US, "%.1f", tx.getScoreFraude())).append(",")
-                .append("\"status\":\"").append(tx.getStatus().name()).append("\",")
-                .append("\"motivo\":\"").append(tx.getMotivoFraude().replace("\"", "'")).append("\"")
+                .append("\"id\":").append(txExibir.getId()).append(",")
+                .append("\"origem\":").append(txExibir.getIdContaOrigem()).append(",")
+                .append("\"destino\":").append(txExibir.getIdContaDestino()).append(",")
+                .append("\"valor\":").append(txExibir.getValorCentavos()).append(",")
+                .append("\"score\":").append(String.format(Locale.US, "%.1f", txExibir.getScoreFraude())).append(",")
+                .append("\"status\":\"").append(txExibir.getStatus().name()).append("\",")
+                .append("\"motivo\":\"").append(txExibir.getMotivoFraude().replace("\"", "'")).append("\"")
                 .append("},");
-            json.append("\"arestas\":[{\"origem\":15,\"destino\":40,\"status\":\"").append(tx.getStatus().name()).append("\"}]");
+            json.append("\"arestas\":[{\"origem\":15,\"destino\":40,\"status\":\"").append(txExibir.getStatus().name()).append("\"}]");
             json.append("}");
 
             byte[] bytes = json.toString().getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().set("Content-Type", "application/json; charset=UTF-8");
-            exchange.sendResponseHeaders(200, bytes.length);
-            OutputStream os = exchange.getResponseBody();
-            os.write(bytes);
-            os.close();
-        }
-    }
-
-    static class SmurfingResetHandler implements HttpHandler {
-        @Override
-        public void handle(HttpExchange exchange) throws IOException {
-            passoSmurfingAtual = 0;
-            motor.getJanelaDeslizante().expurgarExpiradas(timestampAtual + 100000000L);
-            String json = "{\"status\":\"ok\"}";
-            byte[] bytes = json.getBytes(StandardCharsets.UTF_8);
-            exchange.getResponseHeaders().set("Content-Type", "application/json; charset=UTF-8");
+            exchange.getResponseHeaders().set("Cache-Control", "no-cache, no-store, must-revalidate");
             exchange.sendResponseHeaders(200, bytes.length);
             OutputStream os = exchange.getResponseBody();
             os.write(bytes);
@@ -690,34 +775,40 @@ public class ServidorVisual {
     static class CicloPassoHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
-            passoCicloAtual++;
-            Transacao tx;
-            String dfsMsg;
-            String proximoTxt;
+            if (passoCicloAtual < 3) passoCicloAtual++;
+            Transacao tx = null;
+            String dfsMsg = "";
+            String proximoTxt = "";
 
             Conta c20 = motor.getTreapContas().obterOuCriar(20, 100_000_00L, 2_000_00L);
             Conta c30 = motor.getTreapContas().obterOuCriar(30, 10_000_00L, 2_000_00L);
             Conta c40 = motor.getTreapContas().obterOuCriar(40, 10_000_00L, 2_000_00L);
 
             if (passoCicloAtual == 1) {
-                timestampAtual += 30_000L;
-                tx = new Transacao(contadorId++, 20, 30, 50_000_00L, timestampAtual);
-                motor.processarTransacao(tx);
-                historicoDecisoes.add(tx);
+                if(historicoDecisoes.size() < 1) {
+                    timestampAtual += 30_000L;
+                    tx = new Transacao(contadorId++, 20, 30, 50_000_00L, timestampAtual);
+                    motor.processarTransacao(tx);
+                    historicoDecisoes.add(tx);
+                } else { tx = historicoDecisoes.get(0); }
                 dfsMsg = "- Pilha DFS: Caminho Aberto.";
                 proximoTxt = "Perna 2: 30 -> 40";
             } else if (passoCicloAtual == 2) {
-                timestampAtual += 45_000L;
-                tx = new Transacao(contadorId++, 30, 40, 49_000_00L, timestampAtual);
-                motor.processarTransacao(tx);
-                historicoDecisoes.add(tx);
+                if(historicoDecisoes.size() < 2) {
+                    timestampAtual += 45_000L;
+                    tx = new Transacao(contadorId++, 30, 40, 49_000_00L, timestampAtual);
+                    motor.processarTransacao(tx);
+                    historicoDecisoes.add(tx);
+                } else { tx = historicoDecisoes.get(1); }
                 dfsMsg = "- Pilha DFS: Caminho Aberto.";
                 proximoTxt = "Perna 3: 40 -> 20 (Fechar Ciclo)";
             } else {
-                timestampAtual += 40_000L;
-                tx = new Transacao(contadorId++, 40, 20, 48_000_00L, timestampAtual);
-                motor.processarTransacao(tx);
-                historicoDecisoes.add(tx);
+                if(historicoDecisoes.size() < 3) {
+                    timestampAtual += 40_000L;
+                    tx = new Transacao(contadorId++, 40, 20, 48_000_00L, timestampAtual);
+                    motor.processarTransacao(tx);
+                    historicoDecisoes.add(tx);
+                } else { tx = historicoDecisoes.get(2); }
                 dfsMsg = "- CICLO DETECTADO: [20 -> 30 -> 40 -> 20]";
                 proximoTxt = "Ciclo Concluido (Resetar)";
             }
@@ -755,20 +846,7 @@ public class ServidorVisual {
 
             byte[] bytes = json.toString().getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().set("Content-Type", "application/json; charset=UTF-8");
-            exchange.sendResponseHeaders(200, bytes.length);
-            OutputStream os = exchange.getResponseBody();
-            os.write(bytes);
-            os.close();
-        }
-    }
-
-    static class CicloResetHandler implements HttpHandler {
-        @Override
-        public void handle(HttpExchange exchange) throws IOException {
-            passoCicloAtual = 0;
-            String json = "{\"status\":\"ok\"}";
-            byte[] bytes = json.getBytes(StandardCharsets.UTF_8);
-            exchange.getResponseHeaders().set("Content-Type", "application/json; charset=UTF-8");
+            exchange.getResponseHeaders().set("Cache-Control", "no-cache, no-store, must-revalidate");
             exchange.sendResponseHeaders(200, bytes.length);
             OutputStream os = exchange.getResponseBody();
             os.write(bytes);
@@ -782,17 +860,19 @@ public class ServidorVisual {
     static class FanInPassoHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
-            int idxOrigem = passoFanInAtual % ORIGENS_FAN_IN.length;
+            if (passoFanInAtual < 5) passoFanInAtual++;
+            
+            int idxOrigem = (passoFanInAtual - 1) % ORIGENS_FAN_IN.length;
             int origem = ORIGENS_FAN_IN[idxOrigem];
             int destino = 80;
-
-            passoFanInAtual++;
             timestampAtual += 20_000L;
 
-            Transacao tx = new Transacao(contadorId++, origem, destino, 8_000_00L, timestampAtual);
-            motor.processarTransacao(tx);
-            historicoDecisoes.add(tx);
-            checarSelagemMerkle();
+            if(historicoDecisoes.size() < passoFanInAtual) {
+                Transacao tx = new Transacao(contadorId++, origem, destino, 8_000_00L, timestampAtual);
+                motor.processarTransacao(tx);
+                historicoDecisoes.add(tx);
+                checarSelagemMerkle();
+            }
 
             Conta cOrigem = motor.getTreapContas().obterOuCriar(origem, 100_000_00L, 2_000_00L);
             Conta c80 = motor.getTreapContas().obterOuCriar(80, 100_000_00L, 2_000_00L);
@@ -804,9 +884,8 @@ public class ServidorVisual {
                 if (i < passoFanInAtual - 1 && i < ORIGENS_FAN_IN.length - 1) nos.append(", ");
             }
 
-            String proximoTxt = (passoFanInAtual < 5) 
-                ? ("Passo " + (passoFanInAtual + 1) + " de 5: Conta " + ORIGENS_FAN_IN[passoFanInAtual % ORIGENS_FAN_IN.length] + " -> 80") 
-                : "Fan-in Concluido (Resetar)";
+            String proximoTxt = (passoFanInAtual < 5) ? ("Passo " + (passoFanInAtual) + " de 5") : "Fan-in Concluido (Resetar)";
+            Transacao txExibir = historicoDecisoes.get(historicoDecisoes.size() - 1);
 
             StringBuilder json = new StringBuilder();
             json.append("{");
@@ -817,13 +896,13 @@ public class ServidorVisual {
             json.append("\"saldoOrigem\":").append(cOrigem.getSaldoCentavos()).append(",");
             json.append("\"saldoDestino\":").append(c80.getSaldoCentavos()).append(",");
             json.append("\"ultimaTransacao\":{")
-                .append("\"id\":").append(tx.getId()).append(",")
-                .append("\"origem\":").append(tx.getIdContaOrigem()).append(",")
-                .append("\"destino\":").append(tx.getIdContaDestino()).append(",")
-                .append("\"valor\":").append(tx.getValorCentavos()).append(",")
-                .append("\"score\":").append(String.format(Locale.US, "%.1f", tx.getScoreFraude())).append(",")
-                .append("\"status\":\"").append(tx.getStatus().name()).append("\",")
-                .append("\"motivo\":\"").append(tx.getMotivoFraude().replace("\"", "'")).append("\"")
+                .append("\"id\":").append(txExibir.getId()).append(",")
+                .append("\"origem\":").append(txExibir.getIdContaOrigem()).append(",")
+                .append("\"destino\":").append(txExibir.getIdContaDestino()).append(",")
+                .append("\"valor\":").append(txExibir.getValorCentavos()).append(",")
+                .append("\"score\":").append(String.format(Locale.US, "%.1f", txExibir.getScoreFraude())).append(",")
+                .append("\"status\":\"").append(txExibir.getStatus().name()).append("\",")
+                .append("\"motivo\":\"").append(txExibir.getMotivoFraude().replace("\"", "'")).append("\"")
                 .append("},");
 
             json.append("\"arestas\":[");
@@ -837,20 +916,7 @@ public class ServidorVisual {
 
             byte[] bytes = json.toString().getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().set("Content-Type", "application/json; charset=UTF-8");
-            exchange.sendResponseHeaders(200, bytes.length);
-            OutputStream os = exchange.getResponseBody();
-            os.write(bytes);
-            os.close();
-        }
-    }
-
-    static class FanInResetHandler implements HttpHandler {
-        @Override
-        public void handle(HttpExchange exchange) throws IOException {
-            passoFanInAtual = 0;
-            String json = "{\"status\":\"ok\"}";
-            byte[] bytes = json.getBytes(StandardCharsets.UTF_8);
-            exchange.getResponseHeaders().set("Content-Type", "application/json; charset=UTF-8");
+            exchange.getResponseHeaders().set("Cache-Control", "no-cache, no-store, must-revalidate");
             exchange.sendResponseHeaders(200, bytes.length);
             OutputStream os = exchange.getResponseBody();
             os.write(bytes);
@@ -864,25 +930,25 @@ public class ServidorVisual {
     static class BurstPassoHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
-            int idxDestino = passoBurstAtual % DESTINOS_BURST.length;
+            if (passoBurstAtual < 5) passoBurstAtual++;
+            
+            int idxDestino = (passoBurstAtual - 1) % DESTINOS_BURST.length;
             int origem = 25;
             int destino = DESTINOS_BURST[idxDestino];
-
-            passoBurstAtual++;
             timestampAtual += 1_500L;
 
-            long valor = 7_000_00L;
-            Transacao tx = new Transacao(contadorId++, origem, destino, valor, timestampAtual);
-            motor.processarTransacao(tx);
-            historicoDecisoes.add(tx);
-            checarSelagemMerkle();
+            if(historicoDecisoes.size() < passoBurstAtual) {
+                Transacao tx = new Transacao(contadorId++, origem, destino, 7_000_00L, timestampAtual);
+                motor.processarTransacao(tx);
+                historicoDecisoes.add(tx);
+                checarSelagemMerkle();
+            }
 
-            String proximoTxt = (passoBurstAtual < 5) 
-                ? ("Disparo " + (passoBurstAtual + 1) + " de 5") 
-                : "Rajada Concluida (Resetar)";
+            String proximoTxt = (passoBurstAtual < 5) ? ("Disparo " + (passoBurstAtual) + " de 5") : "Rajada Concluida (Resetar)";
 
             double tempoTotalSegundos = passoBurstAtual * 1.5;
             int velocidadeEst = (int) ((passoBurstAtual / tempoTotalSegundos) * 60.0);
+            Transacao txExibir = historicoDecisoes.get(historicoDecisoes.size() - 1);
 
             StringBuilder json = new StringBuilder();
             json.append("{");
@@ -892,13 +958,13 @@ public class ServidorVisual {
             json.append("\"tempoTotalDecorrido\":").append(String.format(Locale.US, "%.1f", tempoTotalSegundos)).append(",");
             json.append("\"velocidadePorMinuto\":").append(velocidadeEst).append(",");
             json.append("\"ultimaTransacao\":{")
-                .append("\"id\":").append(tx.getId()).append(",")
-                .append("\"origem\":").append(tx.getIdContaOrigem()).append(",")
-                .append("\"destino\":").append(tx.getIdContaDestino()).append(",")
-                .append("\"valor\":").append(tx.getValorCentavos()).append(",")
-                .append("\"score\":").append(String.format(Locale.US, "%.1f", tx.getScoreFraude())).append(",")
-                .append("\"status\":\"").append(tx.getStatus().name()).append("\",")
-                .append("\"motivo\":\"").append(tx.getMotivoFraude().replace("\"", "'")).append("\"")
+                .append("\"id\":").append(txExibir.getId()).append(",")
+                .append("\"origem\":").append(txExibir.getIdContaOrigem()).append(",")
+                .append("\"destino\":").append(txExibir.getIdContaDestino()).append(",")
+                .append("\"valor\":").append(txExibir.getValorCentavos()).append(",")
+                .append("\"score\":").append(String.format(Locale.US, "%.1f", txExibir.getScoreFraude())).append(",")
+                .append("\"status\":\"").append(txExibir.getStatus().name()).append("\",")
+                .append("\"motivo\":\"").append(txExibir.getMotivoFraude().replace("\"", "'")).append("\"")
                 .append("},");
 
             json.append("\"arestas\":[");
@@ -912,20 +978,7 @@ public class ServidorVisual {
 
             byte[] bytes = json.toString().getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().set("Content-Type", "application/json; charset=UTF-8");
-            exchange.sendResponseHeaders(200, bytes.length);
-            OutputStream os = exchange.getResponseBody();
-            os.write(bytes);
-            os.close();
-        }
-    }
-
-    static class BurstResetHandler implements HttpHandler {
-        @Override
-        public void handle(HttpExchange exchange) throws IOException {
-            passoBurstAtual = 0;
-            String json = "{\"status\":\"ok\"}";
-            byte[] bytes = json.getBytes(StandardCharsets.UTF_8);
-            exchange.getResponseHeaders().set("Content-Type", "application/json; charset=UTF-8");
+            exchange.getResponseHeaders().set("Cache-Control", "no-cache, no-store, must-revalidate");
             exchange.sendResponseHeaders(200, bytes.length);
             OutputStream os = exchange.getResponseBody();
             os.write(bytes);
@@ -934,17 +987,15 @@ public class ServidorVisual {
     }
 
     // =========================================================
-    // DEMAIS HANDLERS (CONTAS, EXTRATOS, GERAL)
+    // DEMAIS HANDLERS (CONTAS, GERAL)
     // =========================================================
     static class ListarTodasContasHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
             StringBuilder json = new StringBuilder("[");
-
             for (int i = 0; i < CONTAS_SISTEMA.length; i++) {
                 int id = CONTAS_SISTEMA[i];
                 Conta conta = motor.getTreapContas().obterOuCriar(id, 100_000_00L, 2_000_00L);
-
                 json.append("{")
                     .append("\"id\":").append(conta.getIdConta()).append(",")
                     .append("\"saldo\":").append(conta.getSaldoCentavos()).append(",")
@@ -952,157 +1003,12 @@ public class ServidorVisual {
                     .append("\"scoreRisco\":").append(String.format(Locale.US, "%.2f", conta.getScoreRisco())).append(",")
                     .append("\"retencao\":").append(String.format(Locale.US, "%.2f", conta.calcularTaxaRetencao()))
                     .append("}");
-
                 if (i < CONTAS_SISTEMA.length - 1) json.append(",");
             }
             json.append("]");
-
             byte[] bytes = json.toString().getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().set("Content-Type", "application/json; charset=UTF-8");
-            exchange.sendResponseHeaders(200, bytes.length);
-            OutputStream os = exchange.getResponseBody();
-            os.write(bytes);
-            os.close();
-        }
-    }
-
-    static class ExtratoContaHandler implements HttpHandler {
-        @Override
-        public void handle(HttpExchange exchange) throws IOException {
-            String query = exchange.getRequestURI().getQuery();
-            int id = 80;
-            if (query != null && query.contains("id=")) {
-                try {
-                    id = Integer.parseInt(query.split("id=")[1].split("&")[0]);
-                } catch (Exception e) {
-                    id = 80;
-                }
-            }
-
-            Conta conta = motor.getTreapContas().obterOuCriar(id, 100_000_00L, 2_000_00L);
-
-            List<Transacao> extratoConta = new ArrayList<>();
-            long totalEnviado = 0;
-            long totalRecebido = 0;
-
-            for (Transacao tx : historicoDecisoes) {
-                if (tx.getIdContaOrigem() == id || tx.getIdContaDestino() == id) {
-                    extratoConta.add(tx);
-                    if (tx.getIdContaOrigem() == id && tx.getStatus() != StatusTransacao.BLOQUEADA) {
-                        totalEnviado += tx.getValorCentavos();
-                    }
-                    if (tx.getIdContaDestino() == id && tx.getStatus() != StatusTransacao.BLOQUEADA) {
-                        totalRecebido += tx.getValorCentavos();
-                    }
-                }
-            }
-
-            StringBuilder json = new StringBuilder();
-            json.append("{");
-            json.append("\"conta\":{")
-                .append("\"id\":").append(conta.getIdConta()).append(",")
-                .append("\"saldo\":").append(conta.getSaldoCentavos()).append(",")
-                .append("\"scoreRisco\":").append(String.format(Locale.US, "%.2f", conta.getScoreRisco()))
-                .append("},");
-            json.append("\"totalEnviado\":").append(totalEnviado).append(",");
-            json.append("\"totalRecebido\":").append(totalRecebido).append(",");
-            json.append("\"transacoes\":[");
-
-            for (int i = 0; i < extratoConta.size(); i++) {
-                Transacao tx = extratoConta.get(i);
-                json.append("{")
-                    .append("\"id\":").append(tx.getId()).append(",")
-                    .append("\"origem\":").append(tx.getIdContaOrigem()).append(",")
-                    .append("\"destino\":").append(tx.getIdContaDestino()).append(",")
-                    .append("\"valor\":").append(tx.getValorCentavos()).append(",")
-                    .append("\"score\":").append(String.format(Locale.US, "%.1f", tx.getScoreFraude())).append(",")
-                    .append("\"status\":\"").append(tx.getStatus().name()).append("\",")
-                    .append("\"motivo\":\"").append(tx.getMotivoFraude().replace("\"", "'")).append("\"")
-                    .append("}");
-                if (i < extratoConta.size() - 1) json.append(",");
-            }
-            json.append("]}");
-
-            byte[] bytes = json.toString().getBytes(StandardCharsets.UTF_8);
-            exchange.getResponseHeaders().set("Content-Type", "application/json; charset=UTF-8");
-            exchange.sendResponseHeaders(200, bytes.length);
-            OutputStream os = exchange.getResponseBody();
-            os.write(bytes);
-            os.close();
-        }
-    }
-
-    static class GeralProcessarHandler implements HttpHandler {
-        @Override
-        public void handle(HttpExchange exchange) throws IOException {
-            String query = exchange.getRequestURI().getQuery();
-            String tipo = (query != null && query.contains("tipo=")) ? query.split("tipo=")[1] : "legitima";
-
-            if ("limpar".equals(tipo)) {
-                reiniciarSistema();
-            } else if ("legitima".equals(tipo)) {
-                int origem = CONTAS_SISTEMA[random.nextInt(CONTAS_SISTEMA.length)];
-                int destino;
-                do {
-                    destino = CONTAS_SISTEMA[random.nextInt(CONTAS_SISTEMA.length)];
-                } while (destino == origem);
-
-                long valorCentavos = (random.nextInt(900) + 50) * 100L;
-                timestampAtual += (random.nextInt(4) + 1) * 1000L;
-
-                Transacao tx = new Transacao(contadorId++, origem, destino, valorCentavos, timestampAtual);
-                motor.processarTransacao(tx);
-                historicoDecisoes.add(tx);
-            } else if ("avancar_tempo".equals(tipo)) {
-                timestampAtual += (15 * 60 * 1000L);
-                Transacao txAvanco = new Transacao(contadorId++, 10, 80, 100_00L, timestampAtual);
-                motor.processarTransacao(txAvanco);
-                historicoDecisoes.add(txAvanco);
-            }
-
-            checarSelagemMerkle();
-
-            long limiteJanela = timestampAtual - (10 * 60 * 1000L);
-            List<Transacao> ativasNaJanela = new ArrayList<>();
-            for (Transacao t : historicoDecisoes) {
-                if (t.getTimestamp() >= limiteJanela && t.getStatus() != StatusTransacao.BLOQUEADA) {
-                    ativasNaJanela.add(t);
-                }
-            }
-
-            StringBuilder json = new StringBuilder();
-            json.append("{");
-            json.append("\"blocosSelados\":").append(totalBlocosSelados).append(",");
-            json.append("\"arestasAtivas\":[");
-            for (int i = 0; i < ativasNaJanela.size(); i++) {
-                Transacao t = ativasNaJanela.get(i);
-                json.append("{")
-                    .append("\"origem\":").append(t.getIdContaOrigem()).append(",")
-                    .append("\"destino\":").append(t.getIdContaDestino()).append(",")
-                    .append("\"status\":\"").append(t.getStatus().name()).append("\"")
-                    .append("}");
-                if (i < ativasNaJanela.size() - 1) json.append(",");
-            }
-            json.append("],");
-
-            json.append("\"transacoes\":[");
-            for (int i = 0; i < historicoDecisoes.size(); i++) {
-                Transacao t = historicoDecisoes.get(i);
-                json.append("{")
-                    .append("\"id\":").append(t.getId()).append(",")
-                    .append("\"origem\":").append(t.getIdContaOrigem()).append(",")
-                    .append("\"destino\":").append(t.getIdContaDestino()).append(",")
-                    .append("\"valor\":").append(t.getValorCentavos()).append(",")
-                    .append("\"score\":").append(String.format(Locale.US, "%.1f", t.getScoreFraude())).append(",")
-                    .append("\"status\":\"").append(t.getStatus().name()).append("\",")
-                    .append("\"motivo\":\"").append(t.getMotivoFraude().replace("\"", "'")).append("\"")
-                    .append("}");
-                if (i < historicoDecisoes.size() - 1) json.append(",");
-            }
-            json.append("]}");
-
-            byte[] bytes = json.toString().getBytes(StandardCharsets.UTF_8);
-            exchange.getResponseHeaders().set("Content-Type", "application/json; charset=UTF-8");
+            exchange.getResponseHeaders().set("Cache-Control", "no-cache, no-store, must-revalidate");
             exchange.sendResponseHeaders(200, bytes.length);
             OutputStream os = exchange.getResponseBody();
             os.write(bytes);
