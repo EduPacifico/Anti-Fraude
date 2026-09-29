@@ -20,6 +20,7 @@ public class ServidorVisual {
     private static int passoCicloAtual = 0;
     private static int passoFanInAtual = 0;
     private static int passoBurstAtual = 0;
+    private static int passoFluxoAtual = 0; // Novo controlador do pipeline
     
     private static final int[] ORIGENS_FAN_IN = {10, 15, 20, 25, 30};
     private static final int[] DESTINOS_BURST = {50, 60, 70, 80, 10, 30};
@@ -43,13 +44,18 @@ public class ServidorVisual {
         server.createContext("/api/fanin/reset", new FanInResetHandler());
         server.createContext("/api/burst/passo", new BurstPassoHandler());
         server.createContext("/api/burst/reset", new BurstResetHandler());
+        
+        // Novos endpoints do Fluxo Completo
+        server.createContext("/api/fluxo/passo", new FluxoPassoHandler());
+        server.createContext("/api/fluxo/reset", new FluxoResetHandler());
+
         server.createContext("/api/geral/processar", new GeralProcessarHandler());
         server.createContext("/api/contas/todas", new ListarTodasContasHandler());
         server.createContext("/api/conta/extrato", new ExtratoContaHandler());
         server.setExecutor(null);
 
         System.out.println("=================================================================");
-        System.out.println(" Servidor Visual (Modo Compatibilidade Universal Java 8) Iniciado!");
+        System.out.println(" Servidor Visual Iniciado (Com Aba de Pipeline de Transação)!");
         System.out.println(" Acesse no navegador: http://localhost:8080");
         System.out.println("=================================================================");
         server.start();
@@ -65,6 +71,7 @@ public class ServidorVisual {
         passoCicloAtual = 0;
         passoFanInAtual = 0;
         passoBurstAtual = 0;
+        passoFluxoAtual = 0;
         ultimaMerkleRoot = "Nenhum bloco selado ainda";
         totalBlocosSelados = 0;
 
@@ -86,341 +93,432 @@ public class ServidorVisual {
     static class PaginaPrincipalHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
-            // String HTML concatenada para suportar o Java 8/11
             String html = "<!DOCTYPE html>\n" +
-            "<html lang=\"pt-BR\">\n" +
+            "<html lang=\"pt-BR\" data-theme=\"dark\">\n" +
             "<head>\n" +
-            "    <meta charset=\"UTF-8\">\n" +
-            "    <title>Sistema Antifraude - Auditoria Operacional</title>\n" +
-            "    <style>\n" +
-            "        * { box-sizing: border-box; }\n" +
-            "        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #070b14; color: #e2e8f0; margin: 0; padding: 20px; }\n" +
-            "        .container { max-width: 1440px; margin: 0 auto; }\n" +
-            "        .nav-tabs { display: flex; gap: 8px; border-bottom: 2px solid #1e293b; margin-bottom: 18px; flex-wrap: wrap; }\n" +
-            "        .tab-btn { background: #0f172a; color: #94a3b8; border: 1px solid #1e293b; border-bottom: none; padding: 11px 16px; border-radius: 8px 8px 0 0; cursor: pointer; font-weight: 600; font-size: 0.88rem; transition: 0.2s; }\n" +
-            "        .tab-btn:hover { background: #1e293b; color: #f8fafc; }\n" +
-            "        .tab-btn.active { background: #0284c7; color: white; border-color: #0284c7; }\n" +
-            "        .tab-content { display: none; }\n" +
-            "        .tab-content.active { display: block; }\n" +
-            "        .card { background: #0f172a; border: 1px solid #1e293b; border-radius: 12px; padding: 18px; box-shadow: 0 8px 24px rgba(0,0,0,0.4); margin-bottom: 16px; }\n" +
-            "        .grid-main { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 16px; }\n" +
-            "        h2 { margin: 0 0 12px 0; color: #38bdf8; font-size: 1.1rem; }\n" +
-            "        p { margin: 0 0 12px 0; font-size: 0.88rem; color: #94a3b8; line-height: 1.4; }\n" +
-            "        button { background: #0284c7; color: white; border: none; padding: 9px 16px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.88rem; transition: 0.15s; margin-right: 8px; margin-bottom: 8px; }\n" +
-            "        button:hover { background: #0369a1; transform: translateY(-1px); }\n" +
-            "        button.warning { background: #d97706; }\n" +
-            "        button.danger { background: #e11d48; }\n" +
-            "        button.neutral { background: #334155; }\n" +
-            "        button.sm { padding: 5px 10px; font-size: 0.78rem; }\n" +
-            "        canvas { background: #020617; border-radius: 8px; border: 1px solid #1e293b; width: 100%; height: 350px; }\n" +
-            "        .step-container { display: flex; flex-direction: column; gap: 12px; }\n" +
-            "        .step-card { background: #020617; border-left: 4px solid #38bdf8; border-radius: 0 8px 8px 0; padding: 14px 16px; border-top: 1px solid #1e293b; border-right: 1px solid #1e293b; border-bottom: 1px solid #1e293b; }\n" +
-            "        .step-card.alert { border-left-color: #f43f5e; background: rgba(225, 29, 72, 0.05); }\n" +
-            "        .step-card.warning { border-left-color: #fbbf24; background: rgba(245, 158, 11, 0.05); }\n" +
-            "        .step-card.ok { border-left-color: #34d399; }\n" +
-            "        .step-title { font-weight: bold; font-size: 0.88rem; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; }\n" +
-            "        .step-desc { font-size: 0.82rem; color: #cbd5e1; line-height: 1.5; font-family: Consolas, monospace; }\n" +
-            "        .badge { padding: 4px 8px; border-radius: 4px; font-weight: 700; font-size: 0.72rem; display: inline-block; }\n" +
-            "        .APROVADA, .REGULAR { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid #059669; }\n" +
-            "        .SUSPEITA, .MODERADO { background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid #d97706; }\n" +
-            "        .BLOQUEADA, .CRITICO { background: rgba(225, 29, 72, 0.2); color: #f43f5e; border: 1px solid #e11d48; }\n" +
-            "        .LARANJA { background: rgba(168, 85, 247, 0.2); color: #c084fc; border: 1px solid #9333ea; }\n" +
-            "        .table-wrapper { max-height: 320px; overflow-y: auto; border: 1px solid #1e293b; border-radius: 8px; }\n" +
-            "        table { width: 100%; border-collapse: collapse; font-size: 0.84rem; text-align: left; }\n" +
-            "        th { background: #020617; color: #94a3b8; padding: 10px 12px; position: sticky; top: 0; font-size: 0.76rem; text-transform: uppercase; }\n" +
-            "        td { padding: 9px 12px; border-top: 1px solid #1e293b; }\n" +
-            "        .metric-badge { background: #0f172a; border: 1px solid #334155; padding: 6px 12px; border-radius: 6px; font-size: 0.82rem; font-weight: bold; color: #38bdf8; display: inline-block; margin-bottom: 10px; }\n" +
-            "        .extrato-header { background: #020617; border: 1px solid #334155; border-radius: 8px; padding: 14px; margin-bottom: 12px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }\n" +
-            "        .extrato-stat-title { font-size: 0.72rem; color: #94a3b8; text-transform: uppercase; }\n" +
-            "        .extrato-stat-val { font-size: 1.15rem; font-weight: bold; color: #f8fafc; margin-top: 2px; }\n" +
-            "    </style>\n" +
+            "  <meta charset=\"UTF-8\">\n" +
+            "  <title>Motor Antifraude | Bancada de Testes</title>\n" +
+            "  <link rel=\"preconnect\" href=\"https://fonts.googleapis.com\">\n" +
+            "  <link rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin>\n" +
+            "  <link rel=\"stylesheet\" href=\"https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap\">\n" +
+            "  <style>\n" +
+            "    :root {\n" +
+            "      --ground: #E9EEF3; --surface: #FFFFFF; --surface-2: #F3F7FA; --stage: #FBFCFE;\n" +
+            "      --ink: #0F1820; --ink-2: #4B5A69; --ink-3: #7B8B9B; --line: #D3DCE5; --line-soft: #E6ECF2;\n" +
+            "      --accent: #2B4FC7; --accent-ink: #FFFFFF; --accent-soft: #E3E9FA;\n" +
+            "      --done: #0F7D63; --compare: #C97A16; --swap: #CE3050; --pivot: #8E4090;\n" +
+            "      --shadow: 0 1px 2px rgba(15,24,32,.06), 0 8px 24px rgba(15,24,32,.06);\n" +
+            "      --radius: 10px; --radius-sm: 6px;\n" +
+            "      --font-display: \"Archivo\", sans-serif; --font-body: \"IBM Plex Sans\", sans-serif; --font-mono: \"IBM Plex Mono\", monospace;\n" +
+            "    }\n" +
+            "    :root[data-theme=\"dark\"] {\n" +
+            "      --ground: #0D1218; --surface: #151C24; --surface-2: #1C242D; --stage: #111820;\n" +
+            "      --ink: #E6EDF4; --ink-2: #9EACBA; --ink-3: #6A7988; --line: #26313C; --line-soft: #1E2831;\n" +
+            "      --accent: #7093FF; --accent-ink: #0D1218; --accent-soft: #1B2540;\n" +
+            "      --done: #36C79E; --compare: #EFA544; --swap: #FF6B84; --pivot: #D284D2;\n" +
+            "      --shadow: 0 1px 2px rgba(0,0,0,.35), 0 8px 24px rgba(0,0,0,.35);\n" +
+            "    }\n" +
+            "    * { box-sizing: border-box; }\n" +
+            "    body { margin: 0; background: var(--ground); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.55; }\n" +
+            "    .wrap { max-width: 1440px; margin: 0 auto; padding: 20px 20px 140px; }\n" +
+            "    header.top { display: flex; align-items: baseline; justify-content: space-between; border-bottom: 1px solid var(--line); padding-bottom: 14px; margin-bottom: 18px; }\n" +
+            "    .wordmark { font-family: var(--font-display); font-size: 22px; font-weight: 700; margin: 0; }\n" +
+            "    .wordmark .dot { color: var(--accent); }\n" +
+            "    .tagline { color: var(--ink-2); font-size: 13.5px; margin: 0; flex: 1; margin-left: 16px; }\n" +
+            "    .theme-btn { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 5px 11px; font-size: 12.5px; color: var(--ink-2); cursor: pointer; }\n" +
+            "    .picker { display: flex; flex-direction: column; gap: 7px; margin-bottom: 16px; }\n" +
+            "    .eyebrow { font-family: var(--font-mono); font-size: 10.5px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-3); }\n" +
+            "    .chips { display: flex; flex-wrap: wrap; gap: 6px; }\n" +
+            "    .chip { background: var(--surface); border: 1px solid var(--line); border-radius: 100px; padding: 5px 13px; font-size: 13px; font-weight: 500; color: var(--ink-2); cursor: pointer; transition: 0.2s; }\n" +
+            "    .chip.active { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }\n" +
+            "    .deck { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(300px, 1fr); gap: 16px; align-items: start; }\n" +
+            "    .panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }\n" +
+            "    .panel-head { padding: 10px 14px; border-bottom: 1px solid var(--line-soft); display: flex; justify-content: space-between; }\n" +
+            "    .panel-title { font-family: var(--font-display); font-weight: 600; font-size: 14px; margin: 0; }\n" +
+            "    .stage { background: var(--stage); padding: 0; position: relative; height: 360px; display: flex; align-items: center; justify-content: center; }\n" +
+            "    canvas { width: 100%; height: 100%; display: block; }\n" +
+            "    .narration { display: flex; gap: 10px; padding: 11px 14px; background: var(--surface-2); border-top: 1px solid var(--line-soft); min-height: 58px; align-items: center; }\n" +
+            "    .step-no { font-family: var(--font-mono); font-size: 11px; background: var(--surface); border: 1px solid var(--line); padding: 1px 6px; border-radius: 4px; color: var(--ink-3); }\n" +
+            "    .code { padding: 6px 0 10px; overflow-x: auto; }\n" +
+            "    .code-line { display: flex; gap: 10px; padding: 1px 14px; font-family: var(--font-mono); font-size: 12.5px; color: var(--ink-2); }\n" +
+            "    .code-line.active { background: var(--accent-soft); border-left: 3px solid var(--accent); color: var(--ink); font-weight: 500; padding-left: 11px; }\n" +
+            "    .code-line .ln { color: var(--ink-3); min-width: 14px; text-align: right; user-select: none; }\n" +
+            "    .metrics { display: grid; grid-template-columns: repeat(3, 1fr); }\n" +
+            "    .metric { padding: 10px 14px; border-right: 1px solid var(--line-soft); }\n" +
+            "    .metric:last-child { border-right: none; }\n" +
+            "    .metric .k { font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; color: var(--ink-3); display: block; }\n" +
+            "    .metric .v { font-family: var(--font-mono); font-size: 20px; font-weight: 600; color: var(--ink); }\n" +
+            "    .v.danger { color: var(--swap); }\n" +
+            "    .v.warning { color: var(--compare); }\n" +
+            "    .v.success { color: var(--done); }\n" +
+            "    .transport { position: fixed; left: 0; right: 0; bottom: 0; background: var(--surface); border-top: 1px solid var(--line); box-shadow: 0 -4px 20px rgba(0,0,0,.35); z-index: 20; padding: 12px 20px; display: flex; justify-content: center; gap: 14px; }\n" +
+            "    .tbtn { background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius-sm); width: 40px; height: 36px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; color: var(--ink-2); transition: 0.2s; }\n" +
+            "    .tbtn:hover { border-color: var(--accent); color: var(--accent); }\n" +
+            "    .tbtn.play { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); width: 50px; }\n" +
+            "    .tbtn svg { width: 16px; height: 16px; fill: currentColor; }\n" +
+            "    table { width: 100%; border-collapse: collapse; font-size: 13px; }\n" +
+            "    th { background: var(--surface-2); padding: 8px; text-align: left; color: var(--ink-3); font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; border-bottom: 1px solid var(--line); }\n" +
+            "    td { padding: 8px; border-bottom: 1px solid var(--line-soft); color: var(--ink); }\n" +
+            "    .table-container { max-height: 360px; overflow-y: auto; }\n" +
+            "  </style>\n" +
             "</head>\n" +
             "<body>\n" +
-            "    <div class=\"container\">\n" +
-            "        <div class=\"nav-tabs\">\n" +
-            "            <button class=\"tab-btn active\" onclick=\"abrirAba('tela-contas', this)\">Contas e Extratos (Treap)</button>\n" +
-            "            <button class=\"tab-btn\" onclick=\"abrirAba('tela-smurfing', this)\">Caso 1: Smurfing</button>\n" +
-            "            <button class=\"tab-btn\" onclick=\"abrirAba('tela-ciclo', this)\">Caso 2: Anel de Lavagem</button>\n" +
-            "            <button class=\"tab-btn\" onclick=\"abrirAba('tela-fanin', this)\">Caso 3: Concentracao (Fan-in)</button>\n" +
-            "            <button class=\"tab-btn\" onclick=\"abrirAba('tela-burst', this)\">Caso 4: Explosao de Velocidade</button>\n" +
-            "            <button class=\"tab-btn\" onclick=\"abrirAba('tela-fluxo', this)\">Caso 5: Rede e Merkle Tree</button>\n" +
-            "        </div>\n" +
-            "        <!-- TELA 0: VISÃO GERAL DE CONTAS E EXTRATOS -->\n" +
-            "        <div id=\"tela-contas\" class=\"tab-content active\">\n" +
-            "            <div class=\"card\">\n" +
-            "                <h2>Perfis de Contas na Treap O(log N)</h2>\n" +
-            "                <p>Saldos e scores de risco mantidos em tempo real na arvore. Clique em <strong>Ver Extrato</strong> para auditar o historico.</p>\n" +
-            "                <button onclick=\"carregarTodasContas()\">Atualizar Tabela</button>\n" +
-            "                <span class=\"metric-badge\" id=\"badgeTotalContas\">10 Contas Monitoradas na Treap</span>\n" +
-            "            </div>\n" +
-            "            <div class=\"card\">\n" +
-            "                <h2>Tabela Geral de Contas</h2>\n" +
-            "                <div class=\"table-wrapper\">\n" +
-            "                    <table>\n" +
-            "                        <thead>\n" +
-            "                            <tr>\n" +
-            "                                <th>ID da Conta</th><th>Saldo Atual</th><th>Media Diaria</th><th>Taxa de Retencao</th><th>Score de Risco</th><th>Classificacao</th><th>Acao</th>\n" +
-            "                            </tr>\n" +
-            "                        </thead>\n" +
-            "                        <tbody id=\"tabelaContasCorpo\">\n" +
-            "                            <tr><td colspan=\"7\" style=\"text-align:center; color:#94a3b8;\">Carregando dados...</td></tr>\n" +
-            "                        </tbody>\n" +
-            "                    </table>\n" +
-            "                </div>\n" +
-            "            </div>\n" +
-            "            <div class=\"card\" id=\"cardExtratoConta\">\n" +
-            "                <h2 id=\"tituloExtrato\">Extrato da Conta Selecionada</h2>\n" +
-            "                <div id=\"conteudoExtrato\">\n" +
-            "                    <p style=\"color:#94a3b8;\">Selecione uma conta na tabela acima.</p>\n" +
-            "                </div>\n" +
-            "            </div>\n" +
-            "        </div>\n" +
-            "        <!-- TELA 1: SMURFING PASSO A PASSO -->\n" +
-            "        <div id=\"tela-smurfing\" class=\"tab-content\">\n" +
-            "            <div class=\"card\">\n" +
-            "                <h2>Cenario: Pulverizacao de R$ 48.000,00 (Conta 15 -> Conta 40)</h2>\n" +
-            "                <button class=\"warning\" onclick=\"proximoPassoSmurfing()\">Executar Proxima Transacao (<span id=\"btnTxtSmurfing\">Passo 1 de 5</span>)</button>\n" +
-            "                <button class=\"neutral\" onclick=\"resetarSmurfing()\">Reiniciar Smurfing</button>\n" +
-            "                <span class=\"metric-badge\" id=\"badgeJanelaSmurfing\">Buffer Janela: 0 transferencias</span>\n" +
-            "            </div>\n" +
-            "            <div class=\"grid-main\">\n" +
-            "                <div class=\"card\">\n" +
-            "                    <h2>Topologia de Envio</h2>\n" +
-            "                    <canvas id=\"canvasSmurfing\" width=\"600\" height=\"350\"></canvas>\n" +
-            "                </div>\n" +
-            "                <div class=\"card\">\n" +
-            "                    <h2>Auditoria Operacional</h2>\n" +
-            "                    <div id=\"passosSmurfingLog\" class=\"step-container\">\n" +
-            "                        <div style=\"color:#94a3b8; font-size:0.85rem;\">Clique em Executar para iniciar.</div>\n" +
-            "                    </div>\n" +
-            "                </div>\n" +
-            "            </div>\n" +
-            "        </div>\n" +
-            "        <!-- TELA 2: ANEL DE LAVAGEM -->\n" +
-            "        <div id=\"tela-ciclo\" class=\"tab-content\">\n" +
-            "            <div class=\"card\">\n" +
-            "                <h2>Cenario: Anel Fechado de Lavagem (20 -> 30 -> 40 -> 20)</h2>\n" +
-            "                <button class=\"danger\" onclick=\"proximoPassoCiclo()\">Executar Proxima Perna (<span id=\"btnTxtCiclo\">Perna 1: 20 -> 30</span>)</button>\n" +
-            "                <button class=\"neutral\" onclick=\"resetarCiclo()\">Reiniciar Anel</button>\n" +
-            "                <span class=\"metric-badge\" id=\"badgeCicloStatus\">Estado do Grafo: Vertices sem arestas</span>\n" +
-            "            </div>\n" +
-            "            <div class=\"grid-main\">\n" +
-            "                <div class=\"card\">\n" +
-            "                    <h2>Grafo Transacional do Anel</h2>\n" +
-            "                    <canvas id=\"canvasCiclo\" width=\"600\" height=\"350\"></canvas>\n" +
-            "                </div>\n" +
-            "                <div class=\"card\">\n" +
-            "                    <h2>Rastreamento Bounded DFS</h2>\n" +
-            "                    <div id=\"passosCicloLog\" class=\"step-container\">\n" +
-            "                        <div style=\"color:#94a3b8; font-size:0.85rem;\">Clique em Executar para iniciar.</div>\n" +
-            "                    </div>\n" +
-            "                </div>\n" +
-            "            </div>\n" +
-            "        </div>\n" +
-            "        <!-- TELA 3: FAN-IN -->\n" +
-            "        <div id=\"tela-fanin\" class=\"tab-content\">\n" +
-            "            <div class=\"card\">\n" +
-            "                <h2>Cenario: Funil de Concentracao (Contas 10, 15, 20, 25, 30 -> Conta 80)</h2>\n" +
-            "                <button class=\"danger\" onclick=\"proximoPassoFanIn()\">Executar Proximo Aporte (<span id=\"btnTxtFanIn\">Passo 1 de 5</span>)</button>\n" +
-            "                <button class=\"neutral\" onclick=\"resetarFanIn()\">Reiniciar Fan-in</button>\n" +
-            "                <span class=\"metric-badge\" id=\"badgeFanInStatus\">Grau de Entrada (In-Degree) da Conta 80: 0</span>\n" +
-            "            </div>\n" +
-            "            <div class=\"grid-main\">\n" +
-            "                <div class=\"card\">\n" +
-            "                    <h2>Topologia em Funil</h2>\n" +
-            "                    <canvas id=\"canvasFanIn\" width=\"600\" height=\"350\"></canvas>\n" +
-            "                </div>\n" +
-            "                <div class=\"card\">\n" +
-            "                    <h2>Auditoria de In-Degree</h2>\n" +
-            "                    <div id=\"passosFanInLog\" class=\"step-container\">\n" +
-            "                        <div style=\"color:#94a3b8; font-size:0.85rem;\">Clique em Executar para iniciar.</div>\n" +
-            "                    </div>\n" +
-            "                </div>\n" +
-            "            </div>\n" +
-            "        </div>\n" +
-            "        <!-- TELA 4: BURST -->\n" +
-            "        <div id=\"tela-burst\" class=\"tab-content\">\n" +
-            "            <div class=\"card\">\n" +
-            "                <h2>Cenario: Rajada Relampago de Disparos (Conta 25)</h2>\n" +
-            "                <button class=\"danger\" onclick=\"proximoPassoBurst()\">Disparar Proxima Transacao Rapida (<span id=\"btnTxtBurst\">Disparo 1 de 5</span>)</button>\n" +
-            "                <button class=\"neutral\" onclick=\"resetarBurst()\">Reiniciar Rajada</button>\n" +
-            "                <span class=\"metric-badge\" id=\"badgeBurstStatus\">Velocidade: 0 disparos / min</span>\n" +
-            "            </div>\n" +
-            "            <div class=\"grid-main\">\n" +
-            "                <div class=\"card\">\n" +
-            "                    <h2>Dispersao Radial em Alta Velocidade</h2>\n" +
-            "                    <canvas id=\"canvasBurst\" width=\"600\" height=\"350\"></canvas>\n" +
-            "                </div>\n" +
-            "                <div class=\"card\">\n" +
-            "                    <h2>Auditoria de Velocidade Temporal</h2>\n" +
-            "                    <div id=\"passosBurstLog\" class=\"step-container\">\n" +
-            "                        <div style=\"color:#94a3b8; font-size:0.85rem;\">Clique em Disparar para iniciar.</div>\n" +
-            "                    </div>\n" +
-            "                </div>\n" +
-            "            </div>\n" +
-            "        </div>\n" +
-            "        <!-- TELA 5: GERAL -->\n" +
-            "        <div id=\"tela-fluxo\" class=\"tab-content\">\n" +
-            "            <div class=\"card\">\n" +
-            "                <h2>Simulacao Geral e Selagem Criptografica</h2>\n" +
-            "                <button onclick=\"executarGeral('legitima')\">Transacao Legitima Aleatoria</button>\n" +
-            "                <button class=\"neutral\" onclick=\"executarGeral('avancar_tempo')\">Avancar Tempo (+15 min / Expurgar)</button>\n" +
-            "                <button class=\"neutral\" onclick=\"executarGeral('limpar')\">Resetar Tudo</button>\n" +
-            "                <span class=\"metric-badge\" id=\"badgeGeralMerkle\">Blocos Merkle Selados: 0</span>\n" +
-            "            </div>\n" +
-            "            <div class=\"grid-main\">\n" +
-            "                <div class=\"card\">\n" +
-            "                    <h2>Rede Completa (10 Contas Monitoradas)</h2>\n" +
-            "                    <canvas id=\"canvasGeral\" width=\"600\" height=\"350\"></canvas>\n" +
-            "                </div>\n" +
-            "                <div class=\"card\">\n" +
-            "                    <h2>Log Historico de Decisoes</h2>\n" +
-            "                    <div class=\"table-wrapper\">\n" +
-            "                        <table>\n" +
-            "                            <thead>\n" +
-            "                                <tr><th>ID</th><th>Origem -> Destino</th><th>Valor</th><th>Score</th><th>Status</th><th>Motivo</th></tr>\n" +
-            "                            </thead>\n" +
-            "                            <tbody id=\"tabelaGeralCorpo\"></tbody>\n" +
-            "                        </table>\n" +
-            "                    </div>\n" +
-            "                </div>\n" +
-            "            </div>\n" +
-            "        </div>\n" +
+            "  <div class=\"wrap\">\n" +
+            "    <header class=\"top\">\n" +
+            "      <h1 class=\"wordmark\">Motor Antifraude<span class=\"dot\">.</span></h1>\n" +
+            "      <p class=\"tagline\">Análise de risco em grafos, árvores e janelas temporais passo a passo.</p>\n" +
+            "      <button class=\"theme-btn\" id=\"theme-toggle\" type=\"button\">Modo Claro / Escuro</button>\n" +
+            "    </header>\n" +
+            "\n" +
+            "    <div class=\"picker\">\n" +
+            "      <span class=\"eyebrow\">Cenários e Algoritmos</span>\n" +
+            "      <div class=\"chips\">\n" +
+            "        <button class=\"chip active\" onclick=\"mudarAba('fluxo', this)\">0. Pipeline Completo</button>\n" +
+            "        <button class=\"chip\" onclick=\"mudarAba('contas', this)\">1. Treap (Contas/Saldo)</button>\n" +
+            "        <button class=\"chip\" onclick=\"mudarAba('smurfing', this)\">2. Janela: Smurfing</button>\n" +
+            "        <button class=\"chip\" onclick=\"mudarAba('burst', this)\">3. Janela: Velocity Burst</button>\n" +
+            "        <button class=\"chip\" onclick=\"mudarAba('ciclo', this)\">4. Grafo: Bounded DFS (Lavagem)</button>\n" +
+            "        <button class=\"chip\" onclick=\"mudarAba('fanin', this)\">5. Grafo: In-Degree (Mulas)</button>\n" +
+            "      </div>\n" +
             "    </div>\n" +
-            "    <script>\n" +
-            "        let contaAtivaExtrato = 80;\n" +
-            "        function abrirAba(abaId, btn) {\n" +
-            "            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));\n" +
-            "            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));\n" +
-            "            btn.classList.add('active');\n" +
-            "            document.getElementById(abaId).classList.add('active');\n" +
-            "            if (abaId === 'tela-contas') carregarTodasContas();\n" +
-            "            if (abaId === 'tela-smurfing') desenharCanvasSmurfing(arestasSmurfing);\n" +
-            "            if (abaId === 'tela-ciclo') desenharCanvasCiclo(arestasCiclo);\n" +
-            "            if (abaId === 'tela-fanin') desenharCanvasFanIn(arestasFanIn);\n" +
-            "            if (abaId === 'tela-burst') desenharCanvasBurst(arestasBurst);\n" +
-            "            if (abaId === 'tela-fluxo') desenharCanvasGeral(arestasGeral);\n" +
-            "        }\n" +
-            "        async function carregarTodasContas() {\n" +
-            "            const res = await fetch('/api/contas/todas');\n" +
-            "            const contas = await res.json();\n" +
-            "            const tbody = document.getElementById('tabelaContasCorpo');\n" +
-            "            tbody.innerHTML = '';\n" +
-            "            contas.forEach(c => {\n" +
-            "                let badgeClass = 'REGULAR'; let badgeLabel = 'NORMAL';\n" +
-            "                if (c.scoreRisco >= 75.0) { badgeClass = 'CRITICO'; badgeLabel = 'ALTO RISCO (BLOQUEADA)'; }\n" +
-            "                else if (c.retencao < 0.15 && c.scoreRisco >= 20.0) { badgeClass = 'LARANJA'; badgeLabel = 'CONTA DE PASSAGEM'; }\n" +
-            "                else if (c.scoreRisco >= 35.0) { badgeClass = 'MODERADO'; badgeLabel = 'SUSPEITA MODERADA'; }\n" +
-            "                const tr = document.createElement('tr');\n" +
-            "                tr.innerHTML = `<td><strong>Conta #${c.id}</strong></td><td style=\"color:#34d399; font-weight:600;\">R$ ${(c.saldo / 100).toFixed(2)}</td><td>R$ ${(c.volumeMedio / 100).toFixed(2)}</td><td>${(c.retencao * 100).toFixed(1)}%</td><td><strong style=\"color:${c.scoreRisco > 50 ? '#f43f5e' : (c.scoreRisco > 30 ? '#fbbf24' : '#38bdf8')};\">${c.scoreRisco.toFixed(1)}</strong> / 100</td><td><span class=\"badge ${badgeClass}\">${badgeLabel}</span></td><td><button class=\"neutral sm\" onclick=\"carregarExtratoConta(${c.id})\">Ver Extrato</button></td>`;\n" +
-            "                tbody.appendChild(tr);\n" +
+            "\n" +
+            "    <div class=\"deck\">\n" +
+            "      <!-- COLUNA ESQUERDA: PALCO -->\n" +
+            "      <div class=\"stage-col\">\n" +
+            "        <section class=\"panel\">\n" +
+            "          <div class=\"panel-head\">\n" +
+            "            <h2 class=\"panel-title\" id=\"stage-title\">Dados em Memória</h2>\n" +
+            "            <span class=\"eyebrow\" id=\"stage-status\">Execução Ociosa</span>\n" +
+            "          </div>\n" +
+            "          <div class=\"stage\" id=\"stage-container\">\n" +
+            "             <canvas id=\"mainCanvas\"></canvas>\n" +
+            "             <div id=\"table-container\" class=\"table-container\" style=\"display:none; width:100%; height:100%;\"></div>\n" +
+            "          </div>\n" +
+            "          <div class=\"narration\">\n" +
+            "            <span class=\"step-no\" id=\"step-counter\">0 / 0</span>\n" +
+            "            <div style=\"width:100%;\">\n" +
+            "               <p id=\"narrative-text\" style=\"margin:0;\">Selecione um cenário acima e aperte Play.</p>\n" +
+            "            </div>\n" +
+            "          </div>\n" +
+            "        </section>\n" +
+            "      </div>\n" +
+            "\n" +
+            "      <!-- COLUNA DIREITA: LÓGICA E MÉTRICAS -->\n" +
+            "      <div class=\"stage-col\">\n" +
+            "        <section class=\"panel\">\n" +
+            "          <div class=\"panel-head\"><h2 class=\"panel-title\">Pseudocódigo (MotorFraude.java)</h2></div>\n" +
+            "          <div class=\"code\" id=\"pseudocode-box\">\n" +
+            "          </div>\n" +
+            "        </section>\n" +
+            "\n" +
+            "        <section class=\"panel\">\n" +
+            "          <div class=\"panel-head\"><h2 class=\"panel-title\">Métricas da Transação</h2></div>\n" +
+            "          <div class=\"metrics\">\n" +
+            "            <div class=\"metric\"><span class=\"k\">Score Fraude</span><span class=\"v\" id=\"m-score\">0.0</span></div>\n" +
+            "            <div class=\"metric\"><span class=\"k\">Decisão</span><span class=\"v\" id=\"m-status\">-</span></div>\n" +
+            "            <div class=\"metric\"><span class=\"k\">Vértices / Buffer</span><span class=\"v\" id=\"m-extra\">-</span></div>\n" +
+            "          </div>\n" +
+            "        </section>\n" +
+            "      </div>\n" +
+            "    </div>\n" +
+            "  </div>\n" +
+            "\n" +
+            "  <!-- BARRA DE TRANSPORTE -->\n" +
+            "  <div class=\"transport\">\n" +
+            "      <button class=\"tbtn\" onclick=\"resetCurrent()\" title=\"Resetar Cenário\">\n" +
+            "        <svg viewBox=\"0 0 24 24\"><path d=\"M6 5h2.5v14H6zM20 5v14L9.5 12z\"/></svg>\n" +
+            "      </button>\n" +
+            "      <button class=\"tbtn play\" id=\"btn-play\" onclick=\"togglePlay()\" title=\"Reproduzir Lote (Automático)\">\n" +
+            "        <svg viewBox=\"0 0 24 24\" id=\"icon-play\"><path d=\"M7 4v16l13-8z\"/></svg>\n" +
+            "      </button>\n" +
+            "      <button class=\"tbtn\" onclick=\"nextStep()\" title=\"Avançar 1 Passo\">\n" +
+            "        <svg viewBox=\"0 0 24 24\"><path d=\"M6 5v14l11-7z\"/></svg>\n" +
+            "      </button>\n" +
+            "  </div>\n" +
+            "\n" +
+            "  <script>\n" +
+            "    const root = document.documentElement;\n" +
+            "    document.getElementById('theme-toggle').onclick = () => {\n" +
+            "      root.setAttribute('data-theme', root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');\n" +
+            "      desenharGrafoAtual();\n" +
+            "    };\n" +
+            "\n" +
+            "    let abaAtual = 'fluxo';\n" +
+            "    let isPlaying = false;\n" +
+            "    let playInterval = null;\n" +
+            "    let estadoArestas = [];\n" +
+            "    let estadoFluxo = {}; // Para gerenciar a aba pipeline\n" +
+            "\n" +
+            "    const codigos = {\n" +
+            "      'fluxo': [\n" +
+            "         \"1. Transação criada (C10 -> C20)\",\n" +
+            "         \"2. TreapContas.verificarSaldo(tx.origem, tx.valor)\",\n" +
+            "         \"3. JanelaDeslizante.avaliarRisco(tx)\",\n" +
+            "         \"4. GrafoTransacional.avaliarRisco(tx)\",\n" +
+            "         \"5. se (score < 50): efetivar_transferencia()\",\n" +
+            "      ],\n" +
+            "      'contas': [\n" +
+            "         \"Treap.obterOuCriar(idConta):\",\n" +
+            "         \"  se raiz == nulo: insere novo NoTreap\",\n" +
+            "         \"  senão: busca binária (O(log N))\",\n" +
+            "         \"  mantém balanceamento por Max-Heap\",\n" +
+            "         \"  retorna Perfil da Conta (Saldo, Média)\"\n" +
+            "      ],\n" +
+            "      'smurfing': [\n" +
+            "         \"limite = tempoAtual - 10_minutos\",\n" +
+            "         \"idx = JanelaDeslizante.lowerBound(limite)\",\n" +
+            "         \"para i = idx até buffer.size():\",\n" +
+            "         \"  acumula valores da origem\",\n" +
+            "         \"se qtd >= 4 E total >= 25k:\",\n" +
+            "         \"  score += 45 (Flag SMURFING)\"\n" +
+            "      ],\n" +
+            "      'ciclo': [\n" +
+            "         \"BoundedDFS(origem, destino, depth=0):\",\n" +
+            "         \"  se origem == destino: ACHOU CICLO\",\n" +
+            "         \"  se depth >= 4: retorna FALSO\",\n" +
+            "         \"  para vizinho em Grafo.get(origem):\",\n" +
+            "         \"    se tempo_vizinho > tempo_atual: continua\",\n" +
+            "         \"    se variacao > 20%: continua\",\n" +
+            "         \"    BoundedDFS(vizinho, destino, depth+1)\"\n" +
+            "      ],\n" +
+            "      'fanin': [\n" +
+            "         \"Para avaliar Fan-In (Mulas/Laranjas):\",\n" +
+            "         \"  grauEntrada = Grafo.getEntradas(destino)\",\n" +
+            "         \"  se grauEntrada >= 4:\",\n" +
+            "         \"    alerta = VERDADEIRO\",\n" +
+            "         \"    score += 45 (Flag FAN-IN)\"\n" +
+            "      ],\n" +
+            "      'burst': [\n" +
+            "         \"limiteCurto = tempoAtual - 60_segundos\",\n" +
+            "         \"contaDisparos = 0\",\n" +
+            "         \"para tx no buffer recente:\",\n" +
+            "         \"  se tx.origem == origem: contaDisparos++\",\n" +
+            "         \"se contaDisparos >= 4:\",\n" +
+            "         \"  score += 30 (Flag VELOCIDADE)\"\n" +
+            "      ]\n" +
+            "    };\n" +
+            "\n" +
+            "    function mudarAba(aba, btn) {\n" +
+            "      document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));\n" +
+            "      btn.classList.add('active');\n" +
+            "      abaAtual = aba;\n" +
+            "      estadoArestas = [];\n" +
+            "      estadoFluxo = {};\n" +
+            "      atualizarPseudocodigo(aba, -1);\n" +
+            "      \n" +
+            "      if(aba === 'contas' || aba === 'merkle') {\n" +
+            "         document.getElementById('mainCanvas').style.display = 'none';\n" +
+            "         document.getElementById('table-container').style.display = 'block';\n" +
+            "         carregarTabela(aba);\n" +
+            "      } else {\n" +
+            "         document.getElementById('mainCanvas').style.display = 'block';\n" +
+            "         document.getElementById('table-container').style.display = 'none';\n" +
+            "         desenharGrafoAtual();\n" +
+            "      }\n" +
+            "      if (isPlaying) togglePlay();\n" +
+            "      resetCurrent();\n" +
+            "    }\n" +
+            "\n" +
+            "    function atualizarPseudocodigo(aba, linhaDestaque) {\n" +
+            "      const box = document.getElementById('pseudocode-box');\n" +
+            "      let h = '';\n" +
+            "      codigos[aba].forEach((linha, i) => {\n" +
+            "        const active = (i === linhaDestaque) ? 'active' : '';\n" +
+            "        h += `<div class=\"code-line ${active}\"><span class=\"ln\">${i+1}</span><span>${linha}</span></div>`;\n" +
+            "      });\n" +
+            "      box.innerHTML = h;\n" +
+            "    }\n" +
+            "\n" +
+            "    async function carregarTabela(tipo) {\n" +
+            "      const title = document.getElementById('stage-title');\n" +
+            "      const tbl = document.getElementById('table-container');\n" +
+            "      if (tipo === 'contas') {\n" +
+            "        title.innerText = 'Treap: Tabela de Contas (O(log N))';\n" +
+            "        const res = await fetch('/api/contas/todas'); const data = await res.json();\n" +
+            "        let h = `<table><tr><th>ID Conta</th><th>Saldo (R$)</th><th>Score</th></tr>`;\n" +
+            "        data.forEach(c => { h += `<tr><td><strong>#${c.id}</strong></td><td>${(c.saldo/100).toFixed(2)}</td><td style=\"color:${c.scoreRisco>50?'var(--swap)':'var(--done)'}\">${c.scoreRisco.toFixed(1)}</td></tr>`; });\n" +
+            "        tbl.innerHTML = h + `</table>`;\n" +
+            "      }\n" +
+            "    }\n" +
+            "\n" +
+            "    // --- ENGINE DO CANVAS --- \n" +
+            "    function getCSSVar(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }\n" +
+            "    \n" +
+            "    function desenharSeta(ctx, fromX, fromY, toX, toY, cor) {\n" +
+            "        const headlen = 12; const angle = Math.atan2(toY - fromY, toX - fromX); const raioNo = 25;\n" +
+            "        const inicioX = fromX + raioNo * Math.cos(angle); const inicioY = fromY + raioNo * Math.sin(angle);\n" +
+            "        const fimX = toX - raioNo * Math.cos(angle); const fimY = toY - raioNo * Math.sin(angle);\n" +
+            "        ctx.beginPath(); ctx.moveTo(inicioX, inicioY); ctx.lineTo(fimX, fimY); ctx.strokeStyle = cor; ctx.lineWidth = 3; ctx.stroke();\n" +
+            "        ctx.beginPath(); ctx.moveTo(fimX, fimY); ctx.lineTo(fimX - headlen * Math.cos(angle - Math.PI / 6), fimY - headlen * Math.sin(angle - Math.PI / 6)); ctx.lineTo(fimX - headlen * Math.cos(angle + Math.PI / 6), fimY - headlen * Math.sin(angle + Math.PI / 6)); ctx.fillStyle = cor; ctx.fill();\n" +
+            "    }\n" +
+            "\n" +
+            "    function desenharGrafoAtual() {\n" +
+            "        if(abaAtual === 'contas' || abaAtual === 'merkle') return;\n" +
+            "        const canvas = document.getElementById('mainCanvas'); const ctx = canvas.getContext('2d');\n" +
+            "        canvas.width = canvas.clientWidth; canvas.height = canvas.clientHeight;\n" +
+            "        ctx.clearRect(0, 0, canvas.width, canvas.height);\n" +
+            "\n" +
+            "        // ----------- ABA FLUXO (PIPELINE) -----------\n" +
+            "        if (abaAtual === 'fluxo') {\n" +
+            "            document.getElementById('stage-title').innerText = 'Ciclo de Vida da Transação';\n" +
+            "            const cAtivo = getCSSVar('--accent');\n" +
+            "            const cInativo = getCSSVar('--surface');\n" +
+            "            const nodes = [\n" +
+            "                { id: 'origem', x: canvas.width * 0.1, y: canvas.height / 2, tipo: 'circle', label: 'Origem' },\n" +
+            "                { id: 'treap', x: canvas.width * 0.3, y: canvas.height / 2, tipo: 'rect', label: 'Treap (Saldo)' },\n" +
+            "                { id: 'janela', x: canvas.width * 0.5, y: canvas.height / 2, tipo: 'rect', label: 'Janela (Burst)' },\n" +
+            "                { id: 'grafo', x: canvas.width * 0.7, y: canvas.height / 2, tipo: 'rect', label: 'Grafo (Lavagem)' },\n" +
+            "                { id: 'destino', x: canvas.width * 0.9, y: canvas.height / 2, tipo: 'circle', label: 'Destino' }\n" +
+            "            ];\n" +
+            "\n" +
+            "            // Desenhar setas conectando os módulos\n" +
+            "            for (let i = 0; i < nodes.length - 1; i++) {\n" +
+            "                let xOrig = nodes[i].x + (nodes[i].tipo === 'rect' ? 45 : 25);\n" +
+            "                let xDest = nodes[i+1].x - (nodes[i+1].tipo === 'rect' ? 45 : 25);\n" +
+            "                desenharSeta(ctx, xOrig, nodes[i].y, xDest, nodes[i+1].y, getCSSVar('--line-soft'));\n" +
+            "            }\n" +
+            "\n" +
+            "            // Pintar os blocos baseados no passo atual\n" +
+            "            const ativoIdx = (estadoFluxo && estadoFluxo.nodeAtivo !== undefined) ? estadoFluxo.nodeAtivo : -1;\n" +
+            "            nodes.forEach((n, i) => {\n" +
+            "                ctx.beginPath();\n" +
+            "                // Se o pipeline acabou (ativo = 4), pinta o destino de verde. Senão, pinta o passo de azul.\n" +
+            "                if (i === ativoIdx) {\n" +
+            "                     ctx.fillStyle = (i === 4) ? getCSSVar('--done') : cAtivo;\n" +
+            "                } else {\n" +
+            "                     ctx.fillStyle = cInativo;\n" +
+            "                }\n" +
+            "\n" +
+            "                if (n.tipo === 'circle') ctx.arc(n.x, n.y, 28, 0, 2 * Math.PI);\n" +
+            "                else ctx.rect(n.x - 45, n.y - 25, 90, 50);\n" +
+            "                \n" +
+            "                ctx.fill(); ctx.strokeStyle = getCSSVar('--line'); ctx.lineWidth = 2; ctx.stroke();\n" +
+            "                ctx.fillStyle = (i === ativoIdx) ? getCSSVar('--accent-ink') : getCSSVar('--ink');\n" +
+            "                ctx.font = 'bold 11px \"IBM Plex Mono\"'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';\n" +
+            "                ctx.fillText(n.label, n.x, n.y);\n" +
             "            });\n" +
-            "            if (contaAtivaExtrato) carregarExtratoConta(contaAtivaExtrato);\n" +
+            "            return;\n" +
             "        }\n" +
-            "        async function carregarExtratoConta(idConta) {\n" +
-            "            contaAtivaExtrato = idConta;\n" +
-            "            const res = await fetch('/api/conta/extrato?id=' + idConta);\n" +
-            "            const data = await res.json();\n" +
-            "            document.getElementById('tituloExtrato').innerText = 'Extrato Detalhado da Conta #' + idConta;\n" +
-            "            let html = `<div class=\"extrato-header\"><div><div class=\"extrato-stat-title\">Saldo Disponivel</div><div class=\"extrato-stat-val\" style=\"color:#34d399;\">R$ ${(data.conta.saldo / 100).toFixed(2)}</div></div><div><div class=\"extrato-stat-title\">Total Enviado</div><div class=\"extrato-stat-val\" style=\"color:#f43f5e;\">R$ ${(data.totalEnviado / 100).toFixed(2)}</div></div><div><div class=\"extrato-stat-title\">Total Recebido</div><div class=\"extrato-stat-val\" style=\"color:#38bdf8;\">R$ ${(data.totalRecebido / 100).toFixed(2)}</div></div><div><div class=\"extrato-stat-title\">Score Risco</div><div class=\"extrato-stat-val\" style=\"color:${data.conta.scoreRisco > 50 ? '#f43f5e' : '#38bdf8'}\">${data.conta.scoreRisco.toFixed(1)} / 100</div></div></div><div class=\"table-wrapper\"><table><thead><tr><th>ID Tx</th><th>Operacao / Fluxo</th><th>Valor</th><th>Score</th><th>Decisao</th><th>Motivo</th></tr></thead><tbody>`;\n" +
-            "            if (data.transacoes.length === 0) html += '<tr><td colspan=\"6\" style=\"text-align:center; color:#94a3b8;\">Nenhuma transacao.</td></tr>';\n" +
-            "            else data.transacoes.slice().reverse().forEach(tx => {\n" +
-            "                const isSaida = (tx.origem === idConta);\n" +
-            "                const tipoFluxo = isSaida ? `<span style=\"color:#f43f5e; font-weight:bold;\">[SAIDA] Para #${tx.destino}</span>` : `<span style=\"color:#34d399; font-weight:bold;\">[ENTRADA] De #${tx.origem}</span>`;\n" +
-            "                html += `<tr><td><strong>#${tx.id}</strong></td><td>${tipoFluxo}</td><td><strong>R$ ${(tx.valor / 100).toFixed(2)}</strong></td><td><strong>${tx.score.toFixed(1)}</strong></td><td><span class=\"badge ${tx.status}\">${tx.status}</span></td><td style=\"color:#cbd5e1; font-family:monospace; font-size:0.75rem;\">${tx.motivo}</td></tr>`;\n" +
-            "            });\n" +
-            "            html += '</tbody></table></div>';\n" +
-            "            document.getElementById('conteudoExtrato').innerHTML = html;\n" +
+            "\n" +
+            "        // ----------- ABAS DE GRAFOS ESPECÍFICOS -----------\n" +
+            "        let pos = {};\n" +
+            "        if (abaAtual === 'smurfing') {\n" +
+            "            document.getElementById('stage-title').innerText = 'Grafo: 15 -> 40 (Pulverização)';\n" +
+            "            pos = { 15: {x: canvas.width*0.2, y: canvas.height/2}, 40: {x: canvas.width*0.8, y: canvas.height/2} };\n" +
+            "        } else if (abaAtual === 'ciclo') {\n" +
+            "            document.getElementById('stage-title').innerText = 'Grafo: Anel 20 -> 30 -> 40 -> 20';\n" +
+            "            pos = { 20: {x: canvas.width/2, y: canvas.height*0.2}, 30: {x: canvas.width*0.8, y: canvas.height*0.7}, 40: {x: canvas.width*0.2, y: canvas.height*0.7} };\n" +
+            "        } else if (abaAtual === 'fanin') {\n" +
+            "            document.getElementById('stage-title').innerText = 'Grafo: Fan-In na Conta 80';\n" +
+            "            pos = { 10: {x: canvas.width*0.1, y: canvas.height*0.1}, 15: {x: canvas.width*0.1, y: canvas.height*0.3}, 20: {x: canvas.width*0.1, y: canvas.height*0.5}, 25: {x: canvas.width*0.1, y: canvas.height*0.7}, 30: {x: canvas.width*0.1, y: canvas.height*0.9}, 80: {x: canvas.width*0.8, y: canvas.height/2} };\n" +
+            "        } else if (abaAtual === 'burst') {\n" +
+            "            document.getElementById('stage-title').innerText = 'Grafo: Explosão Radial da Conta 25';\n" +
+            "            pos = { 25: {x: canvas.width/2, y: canvas.height/2}, 50: {x: canvas.width*0.2, y: canvas.height*0.2}, 60: {x: canvas.width*0.8, y: canvas.height*0.2}, 70: {x: canvas.width*0.8, y: canvas.height*0.8}, 80: {x: canvas.width*0.2, y: canvas.height*0.8}, 10: {x: canvas.width/2, y: canvas.height*0.1} };\n" +
             "        }\n" +
-            "        function desenharSeta(ctx, fromX, fromY, toX, toY, cor, espessura) {\n" +
-            "            const headlen = 11; const angle = Math.atan2(toY - fromY, toX - fromX); const raioNo = 22;\n" +
-            "            const inicioX = fromX + raioNo * Math.cos(angle); const inicioY = fromY + raioNo * Math.sin(angle);\n" +
-            "            const fimX = toX - raioNo * Math.cos(angle); const fimY = toY - raioNo * Math.sin(angle);\n" +
-            "            ctx.beginPath(); ctx.moveTo(inicioX, inicioY); ctx.lineTo(fimX, fimY); ctx.strokeStyle = cor; ctx.lineWidth = espessura; ctx.stroke();\n" +
-            "            ctx.beginPath(); ctx.moveTo(fimX, fimY); ctx.lineTo(fimX - headlen * Math.cos(angle - Math.PI / 6), fimY - headlen * Math.sin(angle - Math.PI / 6)); ctx.lineTo(fimX - headlen * Math.cos(angle + Math.PI / 6), fimY - headlen * Math.sin(angle + Math.PI / 6)); ctx.fillStyle = cor; ctx.fill();\n" +
-            "        }\n" +
-            "        let arestasSmurfing = [];\n" +
-            "        function desenharCanvasSmurfing(arestas) {\n" +
-            "            const canvas = document.getElementById('canvasSmurfing'); if (!canvas) return; const ctx = canvas.getContext('2d'); ctx.clearRect(0, 0, canvas.width, canvas.height);\n" +
-            "            const p15 = {x: 140, y: 175}; const p40 = {x: 460, y: 175};\n" +
-            "            arestas.forEach(a => desenharSeta(ctx, p15.x, p15.y, p40.x, p40.y, a.status === 'SUSPEITA' ? '#fbbf24' : '#38bdf8', a.status === 'SUSPEITA' ? 4 : 2));\n" +
-            "            [{id: 15, x: p15.x, y: p15.y}, {id: 40, x: p40.x, y: p40.y}].forEach(n => { ctx.beginPath(); ctx.arc(n.x, n.y, 24, 0, 2 * Math.PI); ctx.fillStyle = '#1e293b'; ctx.fill(); ctx.strokeStyle = (arestas.length >= 5 && n.id === 15) ? '#fbbf24' : '#64748b'; ctx.lineWidth = 2.5; ctx.stroke(); ctx.fillStyle = '#f8fafc'; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('C' + n.id, n.x, n.y); });\n" +
-            "        }\n" +
-            "        async function proximoPassoSmurfing() {\n" +
-            "            const res = await fetch('/api/smurfing/passo'); const data = await res.json();\n" +
-            "            document.getElementById('btnTxtSmurfing').innerText = data.proximoPassoTexto;\n" +
-            "            document.getElementById('badgeJanelaSmurfing').innerText = `Buffer Janela: ${data.bufferQtd} transferencias | R$ ${(data.bufferValor/100).toFixed(2)}`;\n" +
-            "            arestasSmurfing = data.arestas; desenharCanvasSmurfing(arestasSmurfing);\n" +
-            "            const tx = data.ultimaTransacao; const isFraude = tx.status === 'SUSPEITA' || tx.status === 'BLOQUEADA';\n" +
-            "            document.getElementById('passosSmurfingLog').innerHTML = `<div style=\"font-weight:bold; color:#38bdf8; margin-bottom:8px;\">[Transacao #${tx.id}] Conta 15 -> Conta 40 (R$ ${(tx.valor/100).toFixed(2)})</div><div class=\"step-card ok\"><div class=\"step-title\"><span>1. Validacao na Treap O(log N)</span> <span style=\"color:#34d399;\">CONCLUIDO</span></div><div class=\"step-desc\">- Saldo C15 Suficiente<br>- Valor Atipico detectado</div></div><div class=\"step-card ${isFraude ? 'alert' : 'ok'}\"><div class=\"step-title\"><span>2. Janela Deslizante (lower_bound O(log K))</span> <span style=\"color:${isFraude ? '#f43f5e' : '#34d399'}\">${isFraude ? 'SMURFING' : 'OK'}</span></div><div class=\"step-desc\">- Volume Acumulado: R$ ${(data.bufferValor/100).toFixed(2)}<br>- ${isFraude ? '<span style=\"color:#f43f5e; font-weight:bold;\">Flag de Smurfing disparada!</span>' : 'Abaixo do limite de R$ 25k'}</div></div><div class=\"step-card ${isFraude ? 'warning' : 'ok'}\"><div class=\"step-title\"><span>3. Decisao do Motor</span> <span class=\"badge ${tx.status}\">${tx.status}</span></div><div class=\"step-desc\">- Score Final: <strong>${tx.score.toFixed(1)} / 100</strong></div></div>`;\n" +
-            "        }\n" +
-            "        async function resetarSmurfing() { await fetch('/api/smurfing/reset'); arestasSmurfing = []; document.getElementById('btnTxtSmurfing').innerText = 'Passo 1 de 5'; document.getElementById('badgeJanelaSmurfing').innerText = 'Buffer Janela: 0 transferencias'; document.getElementById('passosSmurfingLog').innerHTML = ''; desenharCanvasSmurfing([]); }\n" +
             "        \n" +
-            "        let arestasCiclo = []; const posCiclo = { 20: {x: 300, y: 80}, 30: {x: 480, y: 260}, 40: {x: 120, y: 260} };\n" +
-            "        function desenharCanvasCiclo(arestas) {\n" +
-            "            const canvas = document.getElementById('canvasCiclo'); if (!canvas) return; const ctx = canvas.getContext('2d'); ctx.clearRect(0, 0, canvas.width, canvas.height);\n" +
-            "            arestas.forEach(a => { const o = posCiclo[a.origem]; const d = posCiclo[a.destino]; if (o && d) desenharSeta(ctx, o.x, o.y, d.x, d.y, a.status === 'BLOQUEADA' ? '#f43f5e' : '#38bdf8', a.status === 'BLOQUEADA' ? 4 : 2.5); });\n" +
-            "            Object.keys(posCiclo).forEach(id => { const p = posCiclo[id]; ctx.beginPath(); ctx.arc(p.x, p.y, 22, 0, 2 * Math.PI); ctx.fillStyle = '#1e293b'; ctx.fill(); ctx.strokeStyle = '#64748b'; ctx.lineWidth = 2; ctx.stroke(); ctx.fillStyle = '#f8fafc'; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('C' + id, p.x, p.y); });\n" +
-            "        }\n" +
-            "        async function proximoPassoCiclo() {\n" +
-            "            const res = await fetch('/api/ciclo/passo'); const data = await res.json();\n" +
-            "            document.getElementById('btnTxtCiclo').innerText = data.proximoPassoTexto; document.getElementById('badgeCicloStatus').innerText = data.statusGrafo;\n" +
-            "            arestasCiclo = data.arestas; desenharCanvasCiclo(arestasCiclo);\n" +
-            "            const tx = data.ultimaTransacao; const isBloqueio = tx.status === 'BLOQUEADA';\n" +
-            "            document.getElementById('passosCicloLog').innerHTML = `<div style=\"font-weight:bold; color:#38bdf8; margin-bottom:8px;\">[Perna ${data.passoAtual} de 3] Transacao #${tx.id}: C${tx.origem} -> C${tx.destino} (R$ ${(tx.valor/100).toFixed(2)})</div><div class=\"step-card ${isBloqueio ? 'alert' : 'ok'}\"><div class=\"step-title\"><span>1. Bounded DFS (Profundidade &le; 4)</span> <span style=\"color:${isBloqueio ? '#f43f5e' : '#34d399'}\">${isBloqueio ? 'CICLO DETECTADO' : 'CAMINHO ABERTO'}</span></div><div class=\"step-desc\">${data.dfsDiagnostico}</div></div><div class=\"step-card ${isBloqueio ? 'warning' : 'ok'}\"><div class=\"step-title\"><span>2. Decisao do Motor</span> <span class=\"badge ${tx.status}\">${tx.status}</span></div><div class=\"step-desc\">- Score: <strong>${tx.score.toFixed(1)} / 100</strong></div></div>`;\n" +
-            "        }\n" +
-            "        async function resetarCiclo() { await fetch('/api/ciclo/reset'); arestasCiclo = []; document.getElementById('btnTxtCiclo').innerText = 'Perna 1: 20 -> 30'; document.getElementById('badgeCicloStatus').innerText = 'Estado: sem arestas'; document.getElementById('passosCicloLog').innerHTML = ''; desenharCanvasCiclo([]); }\n" +
-            "        \n" +
-            "        let arestasFanIn = []; const posFanIn = { 10: {x: 100, y: 70}, 15: {x: 100, y: 175}, 20: {x: 100, y: 280}, 25: {x: 500, y: 100}, 30: {x: 500, y: 250}, 80: {x: 300, y: 175} };\n" +
-            "        function desenharCanvasFanIn(arestas) {\n" +
-            "            const canvas = document.getElementById('canvasFanIn'); if (!canvas) return; const ctx = canvas.getContext('2d'); ctx.clearRect(0, 0, canvas.width, canvas.height);\n" +
-            "            arestas.forEach(a => { const o = posFanIn[a.origem]; const d = posFanIn[a.destino]; if (o && d) desenharSeta(ctx, o.x, o.y, d.x, d.y, a.status === 'SUSPEITA' ? '#fbbf24' : '#38bdf8', 2.5); });\n" +
-            "            Object.keys(posFanIn).forEach(id => { const p = posFanIn[id]; const isC = (id == '80'); ctx.beginPath(); ctx.arc(p.x, p.y, isC ? 26 : 20, 0, 2 * Math.PI); ctx.fillStyle = isC ? '#0f2942' : '#1e293b'; ctx.fill(); ctx.strokeStyle = isC ? (arestas.length >= 4 ? '#fbbf24' : '#38bdf8') : '#64748b'; ctx.lineWidth = isC ? 3 : 2; ctx.stroke(); ctx.fillStyle = '#f8fafc'; ctx.font = isC ? 'bold 12px sans-serif' : 'bold 11px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('C' + id, p.x, p.y); });\n" +
-            "        }\n" +
-            "        async function proximoPassoFanIn() {\n" +
-            "            const res = await fetch('/api/fanin/passo'); const data = await res.json();\n" +
-            "            document.getElementById('btnTxtFanIn').innerText = data.proximoPassoTexto; document.getElementById('badgeFanInStatus').innerText = `Grau de Entrada (In-Degree) C80: ${data.inDegree}`;\n" +
-            "            arestasFanIn = data.arestas; desenharCanvasFanIn(arestasFanIn);\n" +
-            "            const tx = data.ultimaTransacao; const isAlerta = (data.inDegree >= 4);\n" +
-            "            document.getElementById('passosFanInLog').innerHTML = `<div style=\"font-weight:bold; color:#38bdf8; margin-bottom:8px;\">[Aporte ${data.passoAtual} de 5] Transacao #${tx.id}: C${tx.origem} -> C80</div><div class=\"step-card ${isAlerta ? 'warning' : 'ok'}\"><div class=\"step-title\"><span>1. Topologia In-Degree</span> <span style=\"color:${isAlerta ? '#fbbf24' : '#34d399'}\">${isAlerta ? 'FAN-IN DETECTADO' : 'NORMAL'}</span></div><div class=\"step-desc\">- In-Degree = ${data.inDegree} arestas convergentes.</div></div><div class=\"step-card ${isAlerta ? 'warning' : 'ok'}\"><div class=\"step-title\"><span>2. Decisao do Motor</span> <span class=\"badge ${tx.status}\">${tx.status}</span></div><div class=\"step-desc\">- Score: <strong>${tx.score.toFixed(1)} / 100</strong></div></div>`;\n" +
-            "        }\n" +
-            "        async function resetarFanIn() { await fetch('/api/fanin/reset'); arestasFanIn = []; document.getElementById('btnTxtFanIn').innerText = 'Passo 1 de 5: C10 -> 80'; document.getElementById('badgeFanInStatus').innerText = 'In-Degree: 0'; document.getElementById('passosFanInLog').innerHTML = ''; desenharCanvasFanIn([]); }\n" +
-            "        \n" +
-            "        let arestasBurst = []; const posBurst = { 25: {x: 300, y: 175}, 50: {x: 120, y: 80}, 60: {x: 480, y: 80}, 70: {x: 480, y: 270}, 80: {x: 120, y: 270}, 10: {x: 300, y: 40} };\n" +
-            "        function desenharCanvasBurst(arestas) {\n" +
-            "            const canvas = document.getElementById('canvasBurst'); if (!canvas) return; const ctx = canvas.getContext('2d'); ctx.clearRect(0, 0, canvas.width, canvas.height);\n" +
-            "            arestas.forEach(a => { const o = posBurst[a.origem] || posBurst[25]; const d = posBurst[a.destino] || posBurst[50]; if (o && d) desenharSeta(ctx, o.x, o.y, d.x, d.y, a.status === 'SUSPEITA' ? '#fbbf24' : '#38bdf8', 2.8); });\n" +
-            "            Object.keys(posBurst).forEach(id => { const p = posBurst[id]; const isOrig = (id == '25'); ctx.beginPath(); ctx.arc(p.x, p.y, isOrig ? 26 : 20, 0, 2 * Math.PI); ctx.fillStyle = isOrig ? '#2c1538' : '#1e293b'; ctx.fill(); ctx.strokeStyle = isOrig ? (arestas.length >= 4 ? '#f43f5e' : '#a855f7') : '#64748b'; ctx.lineWidth = isOrig ? 3.5 : 2; ctx.stroke(); ctx.fillStyle = '#f8fafc'; ctx.font = isOrig ? 'bold 12px sans-serif' : 'bold 11px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('C' + id, p.x, p.y); });\n" +
-            "        }\n" +
-            "        async function proximoPassoBurst() {\n" +
-            "            const res = await fetch('/api/burst/passo'); const data = await res.json();\n" +
-            "            document.getElementById('btnTxtBurst').innerText = data.proximoPassoTexto; document.getElementById('badgeBurstStatus').innerText = `Velocidade: ${data.velocidadePorMinuto} txs/min`;\n" +
-            "            arestasBurst = data.arestas; desenharCanvasBurst(arestasBurst);\n" +
-            "            const tx = data.ultimaTransacao; const isAlerta = (data.passoAtual >= 4);\n" +
-            "            document.getElementById('passosBurstLog').innerHTML = `<div style=\"font-weight:bold; color:#38bdf8; margin-bottom:8px;\">[Disparo ${data.passoAtual} de 5] Transacao #${tx.id}: C25 -> C${tx.destino}</div><div class=\"step-card ${isAlerta ? 'alert' : 'ok'}\"><div class=\"step-title\"><span>1. Janela Deslizante (Taxa Disparos)</span> <span style=\"color:${isAlerta ? '#f43f5e' : '#34d399'}\">${isAlerta ? 'BURST DETECTADO' : 'REGULAR'}</span></div><div class=\"step-desc\">- Cadencia: ${data.passoAtual} txs em ${data.tempoTotalDecorrido} segs.<br>- Velocidade: ${data.velocidadePorMinuto} txs/min</div></div><div class=\"step-card ${isAlerta ? 'warning' : 'ok'}\"><div class=\"step-title\"><span>2. Decisao do Motor</span> <span class=\"badge ${tx.status}\">${tx.status}</span></div><div class=\"step-desc\">- Score: <strong>${tx.score.toFixed(1)} / 100</strong></div></div>`;\n" +
-            "        }\n" +
-            "        async function resetarBurst() { await fetch('/api/burst/reset'); arestasBurst = []; document.getElementById('btnTxtBurst').innerText = 'Disparo 1 de 5'; document.getElementById('badgeBurstStatus').innerText = 'Velocidade: 0 disparos / min'; document.getElementById('passosBurstLog').innerHTML = ''; desenharCanvasBurst([]); }\n" +
-            "        \n" +
-            "        const contasGeral = [10, 15, 20, 25, 30, 40, 50, 60, 70, 80]; const posGeral = {}; let arestasGeral = [];\n" +
-            "        contasGeral.forEach((id, i) => { const angulo = (i / contasGeral.length) * 2 * Math.PI - Math.PI / 2; posGeral[id] = { x: 300 + 130 * Math.cos(angulo), y: 175 + 130 * Math.sin(angulo) }; });\n" +
-            "        function desenharCanvasGeral(arestas) {\n" +
-            "            const canvas = document.getElementById('canvasGeral'); if (!canvas) return; const ctx = canvas.getContext('2d'); ctx.clearRect(0, 0, canvas.width, canvas.height);\n" +
-            "            arestas.forEach(a => { const o = posGeral[a.origem]; const d = posGeral[a.destino]; if (o && d) desenharSeta(ctx, o.x, o.y, d.x, d.y, '#38bdf8', 1.8); });\n" +
-            "            contasGeral.forEach(id => { const p = posGeral[id]; ctx.beginPath(); ctx.arc(p.x, p.y, 18, 0, 2 * Math.PI); ctx.fillStyle = '#1e293b'; ctx.fill(); ctx.strokeStyle = '#64748b'; ctx.lineWidth = 2; ctx.stroke(); ctx.fillStyle = '#f8fafc'; ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('C' + id, p.x, p.y); });\n" +
-            "        }\n" +
-            "        async function executarGeral(tipo) {\n" +
-            "            const res = await fetch('/api/geral/processar?tipo=' + tipo); const data = await res.json();\n" +
-            "            document.getElementById('badgeGeralMerkle').innerText = 'Blocos Merkle Selados: ' + data.blocosSelados;\n" +
-            "            arestasGeral = data.arestasAtivas; desenharCanvasGeral(arestasGeral);\n" +
-            "            const tabela = document.getElementById('tabelaGeralCorpo'); tabela.innerHTML = '';\n" +
-            "            data.transacoes.slice().reverse().forEach(tx => {\n" +
-            "                const tr = document.createElement('tr');\n" +
-            "                tr.innerHTML = `<td><strong>#${tx.id}</strong></td><td>C${tx.origem} -> C${tx.destino}</td><td>R$ ${(tx.valor / 100).toFixed(2)}</td><td><strong>${tx.score.toFixed(1)}</strong></td><td><span class=\"badge ${tx.status}\">${tx.status}</span></td><td style=\"color:#cbd5e1; font-family:monospace; font-size:0.75rem;\">${tx.motivo}</td>`;\n" +
-            "                tabela.appendChild(tr);\n" +
-            "            });\n" +
-            "        }\n" +
-            "        window.onload = () => { carregarTodasContas(); desenharCanvasSmurfing([]); desenharCanvasCiclo([]); desenharCanvasFanIn([]); desenharCanvasBurst([]); desenharCanvasGeral([]); };\n" +
-            "    </script>\n" +
+            "        const cText = getCSSVar('--ink'); const cSurf = getCSSVar('--surface-2');\n" +
+            "        const cDone = getCSSVar('--done'); const cWarn = getCSSVar('--compare'); const cAlert = getCSSVar('--swap');\n" +
+            "\n" +
+            "        estadoArestas.forEach(a => {\n" +
+            "            if (pos[a.origem] && pos[a.destino]) {\n" +
+            "                let corSeta = cDone;\n" +
+            "                if(a.status === 'SUSPEITA') corSeta = cWarn;\n" +
+            "                if(a.status === 'BLOQUEADA') corSeta = cAlert;\n" +
+            "                desenharSeta(ctx, pos[a.origem].x, pos[a.origem].y, pos[a.destino].x, pos[a.destino].y, corSeta);\n" +
+            "            }\n" +
+            "        });\n" +
+            "\n" +
+            "        Object.keys(pos).forEach(id => {\n" +
+            "            const p = pos[id];\n" +
+            "            ctx.beginPath(); ctx.arc(p.x, p.y, 25, 0, 2 * Math.PI); ctx.fillStyle = cSurf; ctx.fill(); ctx.strokeStyle = getCSSVar('--line'); ctx.lineWidth = 2; ctx.stroke();\n" +
+            "            ctx.fillStyle = cText; ctx.font = 'bold 13px \"IBM Plex Mono\"'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('C' + id, p.x, p.y);\n" +
+            "        });\n" +
+            "    }\n" +
+            "\n" +
+            "    // --- PLAYER DE PASSOS (API) --- \n" +
+            "    async function nextStep() {\n" +
+            "      if (abaAtual === 'contas' || abaAtual === 'merkle') return;\n" +
+            "      \n" +
+            "      // Tratamento especial para o Pipeline de Fluxo\n" +
+            "      if (abaAtual === 'fluxo') {\n" +
+            "          const res = await fetch(`/api/fluxo/passo`);\n" +
+            "          const data = await res.json();\n" +
+            "          estadoFluxo = data;\n" +
+            "          desenharGrafoAtual();\n" +
+            "          \n" +
+            "          document.getElementById('m-score').innerText = data.scoreAtual.toFixed(1);\n" +
+            "          document.getElementById('m-score').className = `v ${data.statusAtual === 'APROVADA' ? 'success' : ''}`;\n" +
+            "          document.getElementById('m-status').innerText = data.statusAtual;\n" +
+            "          document.getElementById('m-status').className = `v ${data.statusAtual === 'APROVADA' ? 'success' : ''}`;\n" +
+            "          document.getElementById('m-extra').innerText = data.infoExtra;\n" +
+            "          document.getElementById('step-counter').innerText = `Passo ${data.passoAtual} / 5`;\n" +
+            "          document.getElementById('narrative-text').innerHTML = `<code>Pipeline</code>: <br><span style=\"color:var(--ink-2); font-size:13px;\">${data.mensagem}</span>`;\n" +
+            "          atualizarPseudocodigo('fluxo', data.linhaCodigo);\n" +
+            "          \n" +
+            "          if(data.proximoPassoTexto.includes('Concluido')) pause();\n" +
+            "          return;\n" +
+            "      }\n" +
+            "\n" +
+            "      // Tratamento pros grafos (Smurfing, Ciclos, etc)\n" +
+            "      const res = await fetch(`/api/${abaAtual}/passo`);\n" +
+            "      const data = await res.json();\n" +
+            "      estadoArestas = data.arestas;\n" +
+            "      desenharGrafoAtual();\n" +
+            "      \n" +
+            "      const tx = data.ultimaTransacao;\n" +
+            "      let classCss = 'success';\n" +
+            "      if(tx.status === 'SUSPEITA') classCss = 'warning';\n" +
+            "      if(tx.status === 'BLOQUEADA') classCss = 'danger';\n" +
+            "      \n" +
+            "      document.getElementById('m-score').innerText = tx.score.toFixed(1);\n" +
+            "      document.getElementById('m-score').className = `v ${classCss}`;\n" +
+            "      document.getElementById('m-status').innerText = tx.status;\n" +
+            "      document.getElementById('m-status').className = `v ${classCss}`;\n" +
+            "      document.getElementById('step-counter').innerText = `Passo ${data.passoAtual} / 5`;\n" +
+            "      document.getElementById('narrative-text').innerHTML = `<code>Tx #${tx.id}</code>: C${tx.origem} -> C${tx.destino} (R$ ${(tx.valor/100).toFixed(2)})<br><span style=\"color:var(--ink-2); font-size:13px;\">${tx.motivo}</span>`;\n" +
+            "      \n" +
+            "      if(abaAtual === 'smurfing') { document.getElementById('m-extra').innerText = `${data.bufferQtd} txs na Janela`; atualizarPseudocodigo(abaAtual, tx.status==='SUSPEITA'?4:2); }\n" +
+            "      if(abaAtual === 'ciclo') { document.getElementById('m-extra').innerText = `${data.passoAtual} vértices (DFS)`; atualizarPseudocodigo(abaAtual, tx.status==='BLOQUEADA'?1:5); }\n" +
+            "      if(abaAtual === 'fanin') { document.getElementById('m-extra').innerText = `In-Degree: ${data.inDegree}`; atualizarPseudocodigo(abaAtual, 2); }\n" +
+            "      if(abaAtual === 'burst') { document.getElementById('m-extra').innerText = `${data.velocidadePorMinuto} tx/min`; atualizarPseudocodigo(abaAtual, 4); }\n" +
+            "\n" +
+            "      if(data.proximoPassoTexto.includes('Concluido')) pause();\n" +
+            "    }\n" +
+            "\n" +
+            "    async function resetCurrent() {\n" +
+            "      if (abaAtual !== 'contas' && abaAtual !== 'merkle') {\n" +
+            "          await fetch(`/api/${abaAtual}/reset`);\n" +
+            "          estadoArestas = [];\n" +
+            "          estadoFluxo = {};\n" +
+            "          document.getElementById('m-score').innerText = '0.0';\n" +
+            "          document.getElementById('m-score').className = `v`;\n" +
+            "          document.getElementById('m-status').innerText = '-';\n" +
+            "          document.getElementById('m-status').className = `v`;\n" +
+            "          document.getElementById('m-extra').innerText = '-';\n" +
+            "          document.getElementById('step-counter').innerText = `0 / 0`;\n" +
+            "          document.getElementById('narrative-text').innerText = 'Aperte Play para analisar os dados em memória.';\n" +
+            "          atualizarPseudocodigo(abaAtual, -1);\n" +
+            "          desenharGrafoAtual();\n" +
+            "      }\n" +
+            "    }\n" +
+            "\n" +
+            "    function togglePlay() {\n" +
+            "       if (isPlaying) pause();\n" +
+            "       else {\n" +
+            "          isPlaying = true;\n" +
+            "          document.getElementById('icon-play').innerHTML = '<path d=\"M6 4h4v16H6zM14 4h4v16h-4z\"/>';\n" +
+            "          playInterval = setInterval(nextStep, 2000);\n" +
+            "       }\n" +
+            "    }\n" +
+            "\n" +
+            "    function pause() {\n" +
+            "       isPlaying = false;\n" +
+            "       clearInterval(playInterval);\n" +
+            "       document.getElementById('icon-play').innerHTML = '<path d=\"M7 4v16l13-8z\"/>';\n" +
+            "    }\n" +
+            "\n" +
+            "    window.onload = () => { mudarAba('fluxo', document.querySelector('.chip')); };\n" +
+            "  </script>\n" +
             "</body>\n" +
             "</html>";
 
@@ -432,6 +530,95 @@ public class ServidorVisual {
             os.close();
         }
     }
+
+    // =========================================================================
+    // NOVO HANDLER: PIPELINE (FLUXO COMPLETO DA TRANSAÇÃO)
+    // =========================================================================
+    static class FluxoPassoHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            passoFluxoAtual++;
+            
+            int nodeAtivo = -1;
+            int linhaCodigo = 0;
+            double scoreAtual = 0.0;
+            String statusAtual = "PROCESSANDO";
+            String mensagem = "";
+            String infoExtra = "-";
+            String proximoPassoTexto = "Passo " + (passoFluxoAtual + 1) + " de 5";
+            
+            Conta c10 = motor.getTreapContas().obterOuCriar(10, 100_000_00L, 2_000_00L);
+            
+            if (passoFluxoAtual == 1) {
+                nodeAtivo = 0; // Bolinha Origem
+                linhaCodigo = 0;
+                mensagem = "Transação iniciada na rede. Origem: C10, Destino: C20. Valor R$ 500,00.";
+            } else if (passoFluxoAtual == 2) {
+                nodeAtivo = 1; // Retângulo Treap
+                linhaCodigo = 1;
+                mensagem = "Motor consultou a Treap em O(log N). Saldo disponível confirmado (R$ " + (c10.getSaldoCentavos()/100.0) + "). O lock na conta foi aplicado.";
+                infoExtra = "Saldo Validado";
+            } else if (passoFluxoAtual == 3) {
+                nodeAtivo = 2; // Retângulo Janela
+                linhaCodigo = 2;
+                mensagem = "Análise da Janela Deslizante via Busca Binária. Frequência normal. Nenhum Smurfing ou Velocity Burst detectado nos últimos 10 min.";
+                infoExtra = "Buffer Limpo";
+            } else if (passoFluxoAtual == 4) {
+                nodeAtivo = 3; // Retângulo Grafo
+                linhaCodigo = 3;
+                mensagem = "Grafo Transacional (DFS Limitada). Analisando vizinhança. Nenhum anel de lavagem (Ciclos) ou concentração atípica (Fan-in) identificados.";
+                infoExtra = "Grau Entrada: 0";
+            } else {
+                nodeAtivo = 4; // Bolinha Destino (Fim)
+                linhaCodigo = 4;
+                mensagem = "Score final calculado: 0.0. Transação totalmente APROVADA. Saldos atualizados em memória e bloco enviado para criptografia Merkle.";
+                statusAtual = "APROVADA";
+                infoExtra = "R$ 500 transferidos";
+                proximoPassoTexto = "Concluido (Resetar)";
+                
+                // Processa a transação real no backend para manter a coerência
+                timestampAtual += 1000L;
+                Transacao tx = new Transacao(contadorId++, 10, 20, 500_00L, timestampAtual);
+                motor.processarTransacao(tx);
+                historicoDecisoes.add(tx);
+                checarSelagemMerkle();
+            }
+
+            StringBuilder json = new StringBuilder();
+            json.append("{")
+                .append("\"passoAtual\":").append(passoFluxoAtual).append(",")
+                .append("\"proximoPassoTexto\":\"").append(proximoPassoTexto).append("\",")
+                .append("\"nodeAtivo\":").append(nodeAtivo).append(",")
+                .append("\"linhaCodigo\":").append(linhaCodigo).append(",")
+                .append("\"scoreAtual\":").append(scoreAtual).append(",")
+                .append("\"statusAtual\":\"").append(statusAtual).append("\",")
+                .append("\"infoExtra\":\"").append(infoExtra).append("\",")
+                .append("\"mensagem\":\"").append(mensagem).append("\"")
+                .append("}");
+
+            byte[] bytes = json.toString().getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set("Content-Type", "application/json; charset=UTF-8");
+            exchange.sendResponseHeaders(200, bytes.length);
+            OutputStream os = exchange.getResponseBody();
+            os.write(bytes);
+            os.close();
+        }
+    }
+    
+    static class FluxoResetHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            passoFluxoAtual = 0;
+            String json = "{\"status\":\"ok\"}";
+            byte[] bytes = json.getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set("Content-Type", "application/json; charset=UTF-8");
+            exchange.sendResponseHeaders(200, bytes.length);
+            OutputStream os = exchange.getResponseBody();
+            os.write(bytes);
+            os.close();
+        }
+    }
+
 
     // =========================================================================
     // HANDLERS CASO 1: SMURFING COM AUDITORIA NUMÉRICA
@@ -517,21 +704,21 @@ public class ServidorVisual {
                 tx = new Transacao(contadorId++, 20, 30, 50_000_00L, timestampAtual);
                 motor.processarTransacao(tx);
                 historicoDecisoes.add(tx);
-                dfsMsg = "- Pilha DFS: <code>DFS(no=30, alvo=20)</code> -> Caminho Vazio.";
+                dfsMsg = "- Pilha DFS: Caminho Aberto.";
                 proximoTxt = "Perna 2: 30 -> 40";
             } else if (passoCicloAtual == 2) {
                 timestampAtual += 45_000L;
                 tx = new Transacao(contadorId++, 30, 40, 49_000_00L, timestampAtual);
                 motor.processarTransacao(tx);
                 historicoDecisoes.add(tx);
-                dfsMsg = "- Pilha DFS: <code>DFS(no=40, alvo=30)</code> -> Caminho Vazio.";
+                dfsMsg = "- Pilha DFS: Caminho Aberto.";
                 proximoTxt = "Perna 3: 40 -> 20 (Fechar Ciclo)";
             } else {
                 timestampAtual += 40_000L;
                 tx = new Transacao(contadorId++, 40, 20, 48_000_00L, timestampAtual);
                 motor.processarTransacao(tx);
                 historicoDecisoes.add(tx);
-                dfsMsg = "- <strong>ANEL GEOMETRICO IDENTIFICADO: [20 -> 30 -> 40 -> 20]</strong>. Transacao <strong>BLOQUEADA</strong>.";
+                dfsMsg = "- CICLO DETECTADO: [20 -> 30 -> 40 -> 20]";
                 proximoTxt = "Ciclo Concluido (Resetar)";
             }
 
