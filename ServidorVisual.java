@@ -9,6 +9,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Random;
 
 public class ServidorVisual {
     private static MotorFraude motor;
@@ -28,6 +29,7 @@ public class ServidorVisual {
     private static int totalBlocosSelados = 0;
     private static long contadorId = 1000L;
     private static long timestampAtual = System.currentTimeMillis();
+    private static final Random random = new Random();
 
     public static void main(String[] args) throws IOException {
         reiniciarSistema();
@@ -51,11 +53,14 @@ public class ServidorVisual {
         server.createContext("/api/burst/reset", new ResetGeralHandler());
         
         server.createContext("/api/contas/todas", new ListarTodasContasHandler());
+        
+        // NOVO ENDPOINT: Teste de Stress
+        server.createContext("/api/stress/run", new StressTestHandler());
 
         server.setExecutor(null);
 
         System.out.println("=================================================================");
-        System.out.println(" Servidor Visual Iniciado (Proteção Anti-Cache Ativada)!");
+        System.out.println(" Servidor Visual Iniciado (Com Dashboard de Stress Test)!");
         System.out.println(" Acesse no navegador: http://localhost:8080");
         System.out.println(" Lembre-se de dar Ctrl+F5 no navegador!");
         System.out.println("=================================================================");
@@ -81,7 +86,6 @@ public class ServidorVisual {
         }
     }
 
-    // Método que estava faltando e causou o erro!
     private static void checarSelagemMerkle() {
         if (historicoDecisoes.size() > 0 && historicoDecisoes.size() % 10 == 0) {
             int inicio = historicoDecisoes.size() - 10;
@@ -161,7 +165,7 @@ public class ServidorVisual {
             "    .tbtn:hover { border-color: var(--accent); color: var(--accent); }\n" +
             "    .tbtn.play { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); width: 50px; }\n" +
             "    .tbtn svg { width: 16px; height: 16px; fill: currentColor; }\n" +
-            "    .btn-small { background: var(--surface-2); border: 1px solid var(--line); border-radius: 4px; padding: 4px 10px; font-size: 11px; cursor:pointer; color: var(--ink-2); }\n" +
+            "    .btn-small { background: var(--surface-2); border: 1px solid var(--line); border-radius: 4px; padding: 4px 10px; font-size: 11px; cursor:pointer; color: var(--ink-2); font-weight: 500; }\n" +
             "    .btn-small:hover { border-color: var(--accent); color: var(--accent); }\n" +
             "    table { width: 100%; border-collapse: collapse; font-size: 13px; }\n" +
             "    th { background: var(--surface-2); padding: 8px; text-align: left; color: var(--ink-3); font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; border-bottom: 1px solid var(--line); }\n" +
@@ -180,12 +184,13 @@ public class ServidorVisual {
             "    <div class=\"picker\">\n" +
             "      <span class=\"eyebrow\">Cenários e Algoritmos</span>\n" +
             "      <div class=\"chips\">\n" +
-            "        <button class=\"chip active\" onclick=\"mudarAba('fluxo', this)\">0. Pipeline de Transação</button>\n" +
-            "        <button class=\"chip\" onclick=\"mudarAba('contas', this)\">1. Treap (Contas/Saldo)</button>\n" +
+            "        <button class=\"chip active\" onclick=\"mudarAba('fluxo', this)\">0. Pipeline</button>\n" +
+            "        <button class=\"chip\" onclick=\"mudarAba('contas', this)\">1. Treap (Contas)</button>\n" +
             "        <button class=\"chip\" onclick=\"mudarAba('smurfing', this)\">2. Janela: Smurfing</button>\n" +
-            "        <button class=\"chip\" onclick=\"mudarAba('burst', this)\">3. Janela: Velocity Burst</button>\n" +
-            "        <button class=\"chip\" onclick=\"mudarAba('ciclo', this)\">4. Grafo: Bounded DFS (Lavagem)</button>\n" +
-            "        <button class=\"chip\" onclick=\"mudarAba('fanin', this)\">5. Grafo: In-Degree (Mulas)</button>\n" +
+            "        <button class=\"chip\" onclick=\"mudarAba('burst', this)\">3. Janela: Velocity</button>\n" +
+            "        <button class=\"chip\" onclick=\"mudarAba('ciclo', this)\">4. Grafo: Bounded DFS</button>\n" +
+            "        <button class=\"chip\" onclick=\"mudarAba('fanin', this)\">5. Grafo: In-Degree</button>\n" +
+            "        <button class=\"chip\" style=\"border-color:var(--done); color:var(--done);\" onclick=\"mudarAba('stress', this)\">6. Stress Test ⚡</button>\n" +
             "      </div>\n" +
             "    </div>\n" +
             "\n" +
@@ -202,6 +207,22 @@ public class ServidorVisual {
             "          <div class=\"stage\" id=\"stage-container\">\n" +
             "             <canvas id=\"mainCanvas\"></canvas>\n" +
             "             <div id=\"table-container\" class=\"table-container\" style=\"display:none; width:100%; height:100%;\"></div>\n" +
+            "             \n" +
+            "             <!-- PAINEL DE STRESS TEST -->\n" +
+            "             <div id=\"stress-container\" style=\"display:none; width:100%; height:100%; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:20px;\">\n" +
+            "                 <h2 style=\"font-family:var(--font-display); font-size:20px; margin:0 0 5px;\">Benchmark do Motor (Em Memória)</h2>\n" +
+            "                 <p style=\"color:var(--ink-2); font-size:13px; margin:0 0 20px; max-width:400px;\">Testa a vazão real submetendo milhares de transações simuladas e criando nós dinamicamente na Treap e no Grafo.</p>\n" +
+            "                 <div style=\"display:flex; gap:10px; margin-bottom:20px;\">\n" +
+            "                     <input type=\"number\" id=\"stress-count\" value=\"50000\" min=\"1000\" step=\"1000\" style=\"background:var(--surface); border:1px solid var(--line); color:var(--ink); padding:8px 12px; border-radius:4px; font-family:var(--font-mono); text-align:center; width:120px;\">\n" +
+            "                     <button class=\"btn-small\" id=\"btn-stress\" style=\"background:var(--accent); color:var(--accent-ink); padding:8px 16px; font-size:13px;\" onclick=\"rodarStressTest()\">⚡ INICIAR TESTE</button>\n" +
+            "                 </div>\n" +
+            "                 <div class=\"metrics\" style=\"width:100%; max-width:450px; border:1px solid var(--line); border-radius:var(--radius); overflow:hidden; text-align:left;\">\n" +
+            "                     <div class=\"metric\" style=\"border-right:1px solid var(--line-soft); border-bottom:1px solid var(--line-soft);\"><span class=\"k\">Tempo Total (ms)</span><span class=\"v\" id=\"st-tempo\">-</span></div>\n" +
+            "                     <div class=\"metric\" style=\"border-bottom:1px solid var(--line-soft);\"><span class=\"k\">Vazão (TPS)</span><span class=\"v success\" id=\"st-tps\">-</span></div>\n" +
+            "                     <div class=\"metric\" style=\"border-right:1px solid var(--line-soft);\"><span class=\"k\">Volume Processado</span><span class=\"v\" id=\"st-total\">-</span></div>\n" +
+            "                     <div class=\"metric\"><span class=\"k\">Fraudes Bloqueadas</span><span class=\"v danger\" id=\"st-blocks\">-</span></div>\n" +
+            "                 </div>\n" +
+            "             </div>\n" +
             "          </div>\n" +
             "          <div class=\"narration\">\n" +
             "            <span class=\"step-no\" id=\"step-counter\">0 / 0</span>\n" +
@@ -224,7 +245,7 @@ public class ServidorVisual {
             "          <div class=\"metrics\">\n" +
             "            <div class=\"metric\"><span class=\"k\">Score Fraude</span><span class=\"v\" id=\"m-score\">0.0</span></div>\n" +
             "            <div class=\"metric\"><span class=\"k\">Decisão</span><span class=\"v\" id=\"m-status\">-</span></div>\n" +
-            "            <div class=\"metric\"><span class=\"k\">Vértices / Buffer</span><span class=\"v\" id=\"m-extra\">-</span></div>\n" +
+            "            <div class=\"metric\"><span class=\"k\">Vértices / Info</span><span class=\"v\" id=\"m-extra\">-</span></div>\n" +
             "          </div>\n" +
             "        </section>\n" +
             "      </div>\n" +
@@ -305,6 +326,17 @@ public class ServidorVisual {
             "         \"  se tx.origem == origem: contaDisparos++\",\n" +
             "         \"se contaDisparos >= 4:\",\n" +
             "         \"  score += 30 (Flag VELOCIDADE)\"\n" +
+            "      ],\n" +
+            "      'stress': [\n" +
+            "         \"Inicio do Benchmark:\",\n" +
+            "         \"  start = System.nanoTime();\",\n" +
+            "         \"  Loop (N vezes):\",\n" +
+            "         \"     cria transação pseudoaleatória\",\n" +
+            "         \"     Treap.obterOuCriar() -> Saldo/Perfil\",\n" +
+            "         \"     Avaliação Grafo (Ciclos/Mulas)\",\n" +
+            "         \"     Avaliação Janela Temporal\",\n" +
+            "         \"  end = System.nanoTime();\",\n" +
+            "         \"  retorna (N / segundos); // TPS\"\n" +
             "      ]\n" +
             "    };\n" +
             "\n" +
@@ -326,18 +358,25 @@ public class ServidorVisual {
             "          const divControles = document.getElementById('controles-fluxo');\n" +
             "          const divBarra = document.getElementById('barra-transporte');\n" +
             "          if(divControles) divControles.style.display = (aba === 'fluxo') ? 'flex' : 'none';\n" +
-            "          if(divBarra) divBarra.style.display = (aba === 'fluxo') ? 'none' : 'flex';\n" +
+            "          if(divBarra) divBarra.style.display = (aba === 'fluxo' || aba === 'stress' || aba === 'contas') ? 'none' : 'flex';\n" +
             "\n" +
             "          const mCanvas = document.getElementById('mainCanvas');\n" +
             "          const mTable = document.getElementById('table-container');\n" +
+            "          const mStress = document.getElementById('stress-container');\n" +
             "          \n" +
             "          if(aba === 'contas') {\n" +
             "             if(mCanvas) mCanvas.style.display = 'none';\n" +
             "             if(mTable) mTable.style.display = 'block';\n" +
+            "             if(mStress) mStress.style.display = 'none';\n" +
             "             carregarTabela(aba);\n" +
+            "          } else if (aba === 'stress') {\n" +
+            "             if(mCanvas) mCanvas.style.display = 'none';\n" +
+            "             if(mTable) mTable.style.display = 'none';\n" +
+            "             if(mStress) mStress.style.display = 'flex';\n" +
             "          } else {\n" +
             "             if(mCanvas) mCanvas.style.display = 'block';\n" +
             "             if(mTable) mTable.style.display = 'none';\n" +
+            "             if(mStress) mStress.style.display = 'none';\n" +
             "          }\n" +
             "          await resetCurrent();\n" +
             "      } catch(e) { console.error('Erro ao mudar aba:', e); }\n" +
@@ -372,8 +411,43 @@ public class ServidorVisual {
             "       } catch(e) { console.error(e); }\n" +
             "    }\n" +
             "\n" +
+            "    async function rodarStressTest() {\n" +
+            "        const qtd = document.getElementById('stress-count').value || 50000;\n" +
+            "        const btn = document.getElementById('btn-stress');\n" +
+            "        btn.innerText = 'PROCESSANDO...';\n" +
+            "        btn.disabled = true;\n" +
+            "        \n" +
+            "        document.getElementById('st-tempo').innerText = '...';\n" +
+            "        document.getElementById('st-tps').innerText = '...';\n" +
+            "        document.getElementById('st-total').innerText = '...';\n" +
+            "        document.getElementById('st-blocks').innerText = '...';\n" +
+            "        document.getElementById('narrative-text').innerText = 'Enviando rajada de requisições ao motor...';\n" +
+            "        \n" +
+            "        try {\n" +
+            "            const res = await fetch(`/api/stress/run?qtd=${qtd}`);\n" +
+            "            if(!res.ok) throw new Error('Falha no Stress Test');\n" +
+            "            const data = await res.json();\n" +
+            "            \n" +
+            "            document.getElementById('st-tempo').innerText = data.tempoMs;\n" +
+            "            document.getElementById('st-tps').innerText = data.tps.toLocaleString('pt-BR');\n" +
+            "            document.getElementById('st-total').innerText = data.total.toLocaleString('pt-BR');\n" +
+            "            document.getElementById('st-blocks').innerText = data.bloqueadas.toLocaleString('pt-BR');\n" +
+            "            \n" +
+            "            document.getElementById('narrative-text').innerHTML = `Processou <b>${data.total}</b> requisições em <b>${data.tempoMs} ms</b>. A vazão (throughput) do motor é de <b>${data.tps.toLocaleString('pt-BR')} Transações por Segundo</b>.`;\n" +
+            "            document.getElementById('m-score').innerText = '-';\n" +
+            "            document.getElementById('m-status').innerText = 'CONCLUÍDO';\n" +
+            "            document.getElementById('m-status').className = 'v success';\n" +
+            "            document.getElementById('m-extra').innerText = `${data.tempoMs} ms`;\n" +
+            "            atualizarPseudocodigo('stress', 8);\n" +
+            "        } catch (e) {\n" +
+            "            document.getElementById('narrative-text').innerText = 'Erro ao processar o teste.';\n" +
+            "        }\n" +
+            "        btn.innerText = '⚡ INICIAR TESTE';\n" +
+            "        btn.disabled = false;\n" +
+            "    }\n" +
+            "\n" +
             "    async function nextStep() {\n" +
-            "      if (abaAtual === 'contas') return;\n" +
+            "      if (abaAtual === 'contas' || abaAtual === 'stress') return;\n" +
             "      if (isProcessing) return; \n" +
             "      isProcessing = true;\n" +
             "      \n" +
@@ -437,9 +511,9 @@ public class ServidorVisual {
             "\n" +
             "    async function resetCurrent() {\n" +
             "      if (abaAtual === 'contas') return;\n" +
-            "      try {\n" +
-            "          await fetch(`/api/${abaAtual}/reset`);\n" +
-            "      } catch (e) { console.error(\"Erro ao resetar:\", e); }\n" +
+            "      if (abaAtual !== 'stress') {\n" +
+            "          try { await fetch(`/api/${abaAtual}/reset`); } catch (e) { console.error(e); }\n" +
+            "      }\n" +
             "      \n" +
             "      estadoArestas = [];\n" +
             "      estadoFluxo = {};\n" +
@@ -449,7 +523,9 @@ public class ServidorVisual {
             "      setEl('m-status', '-', 'v');\n" +
             "      setEl('m-extra', '-');\n" +
             "      setEl('step-counter', '0 / 0');\n" +
-            "      setEl('narrative-text', 'Aperte Play para analisar os dados em memória.');\n" +
+            "      \n" +
+            "      if (abaAtual === 'stress') setEl('narrative-text', 'Pronto para iniciar o teste de carga.');\n" +
+            "      else setEl('narrative-text', 'Aperte Play para analisar os dados em memória.');\n" +
             "      \n" +
             "      atualizarPseudocodigo(abaAtual, -1);\n" +
             "      desenharGrafoAtual();\n" +
@@ -466,7 +542,7 @@ public class ServidorVisual {
             "    }\n" +
             "\n" +
             "    function desenharGrafoAtual() {\n" +
-            "        if(abaAtual === 'contas') return;\n" +
+            "        if(abaAtual === 'contas' || abaAtual === 'stress') return;\n" +
             "        const canvas = document.getElementById('mainCanvas');\n" +
             "        if (!canvas) return;\n" +
             "        const ctx = canvas.getContext('2d');\n" +
@@ -594,7 +670,7 @@ public class ServidorVisual {
     }
 
     // =========================================================================
-    // API FLUXO COMPLETO DA TRANSAÇÃO (OPÇÕES: LEGÍTIMA OU FRAUDE)
+    // API FLUXO COMPLETO DA TRANSAÇÃO
     // =========================================================================
     static class FluxoPassoHandler implements HttpHandler {
         @Override
@@ -699,7 +775,78 @@ public class ServidorVisual {
     }
 
     // =========================================================================
-    // API GENÉRICA DE RESET (USADA POR TODAS AS ABAS)
+    // NOVO: ENDPOINT DE STRESS TEST (BENCHMARK DO MOTOR)
+    // =========================================================================
+    static class StressTestHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            String query = exchange.getRequestURI().getQuery();
+            int count = 50000;
+            if (query != null && query.contains("qtd=")) {
+                try { count = Integer.parseInt(query.split("qtd=")[1].split("&")[0]); } catch (Exception e) {}
+            }
+            
+            // Limitador de segurança para não estourar a memória RAM do servidor visual
+            if (count > 500000) count = 500000;
+            
+            int bloqueadas = 0;
+            int aprovadas = 0;
+            long tempTimestamp = timestampAtual;
+            long tempId = contadorId;
+            
+            // Marca o início do Benchmark
+            long startNs = System.nanoTime();
+            
+            for (int i = 0; i < count; i++) {
+                // Sorteia contas num universo muito mais amplo (1 a 2000) 
+                // Isso força a Treap a expandir dinamicamente e provar que O(log N) é rápido!
+                int origem = random.nextInt(2000) + 1;
+                int destino = random.nextInt(2000) + 1;
+                if (origem == destino) destino = (destino == 2000) ? 1 : destino + 1;
+                
+                long valor = (random.nextInt(5000) + 10) * 100L; 
+                tempTimestamp += 50L; // Simula que chegam várias por segundo
+                
+                Transacao tx = new Transacao(tempId++, origem, destino, valor, tempTimestamp);
+                
+                // O Motor processa pra valer: passa pela Treap, DFS de Grafo, In-Degree e Buffer Circular
+                motor.processarTransacao(tx);
+                
+                if (tx.getStatus() == StatusTransacao.BLOQUEADA || tx.getStatus() == StatusTransacao.SUSPEITA) {
+                    bloqueadas++;
+                } else {
+                    aprovadas++;
+                }
+            }
+            
+            // Fim do Benchmark
+            long endNs = System.nanoTime();
+            long tempoMs = (endNs - startNs) / 1_000_000L;
+            if (tempoMs == 0) tempoMs = 1; // Proteção Div by Zero
+            
+            long tps = (count * 1000L) / tempoMs; // TPS = (Qtd * 1000) / Ms
+            
+            StringBuilder json = new StringBuilder();
+            json.append("{")
+                .append("\"total\":").append(count).append(",")
+                .append("\"tempoMs\":").append(tempoMs).append(",")
+                .append("\"tps\":").append(tps).append(",")
+                .append("\"bloqueadas\":").append(bloqueadas).append(",")
+                .append("\"aprovadas\":").append(aprovadas)
+                .append("}");
+
+            byte[] bytes = json.toString().getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set("Content-Type", "application/json; charset=UTF-8");
+            exchange.getResponseHeaders().set("Cache-Control", "no-cache");
+            exchange.sendResponseHeaders(200, bytes.length);
+            OutputStream os = exchange.getResponseBody();
+            os.write(bytes);
+            os.close();
+        }
+    }
+
+    // =========================================================================
+    // API GENÉRICA DE RESET 
     // =========================================================================
     static class ResetGeralHandler implements HttpHandler {
         @Override
