@@ -4,14 +4,22 @@ public class MotorFraude {
     private final TreapContas treapContas;
     private final JanelaDeslizante janelaDeslizante;
     private final GrafoTransacional grafoTransacional;
-    private final long duracaoJanelaMs;
+    private long duracaoJanelaMs;
+    private int profundidadeMaximaDfs;
+    private double toleranciaValorCiclo;
 
     // Limiares de Decisão
     private static final double LIMIAR_SUSPEITA = 40.0;
     private static final double LIMIAR_BLOQUEIO = 75.0;
 
     public MotorFraude(long duracaoJanelaMs) {
+        this(duracaoJanelaMs, 4, 0.20);
+    }
+
+    public MotorFraude(long duracaoJanelaMs, int profundidadeMaximaDfs, double toleranciaValorCiclo) {
         this.duracaoJanelaMs = duracaoJanelaMs;
+        this.profundidadeMaximaDfs = profundidadeMaximaDfs;
+        this.toleranciaValorCiclo = toleranciaValorCiclo;
         this.treapContas = new TreapContas(42L);
         this.janelaDeslizante = new JanelaDeslizante(duracaoJanelaMs);
         this.grafoTransacional = new GrafoTransacional();
@@ -77,8 +85,8 @@ public class MotorFraude {
             tx.getIdContaDestino(), 
             tx.getValorCentavos(), 
             tx.getTimestamp(), 
-            4, 
-            0.20
+            this.profundidadeMaximaDfs, 
+            this.toleranciaValorCiclo
         );
 
         if (resultadoCiclo.isCicloDetectado()) {
@@ -158,4 +166,20 @@ public class MotorFraude {
     public TreapContas getTreapContas() { return treapContas; }
     public JanelaDeslizante getJanelaDeslizante() { return janelaDeslizante; }
     public GrafoTransacional getGrafoTransacional() { return grafoTransacional; }
+
+    public long getDuracaoJanelaMs() { return duracaoJanelaMs; }
+    public void setDuracaoJanelaMs(long duracaoJanelaMs) {
+        this.duracaoJanelaMs = duracaoJanelaMs;
+        this.janelaDeslizante.setDuracaoJanelaMs(duracaoJanelaMs);
+    }
+
+    public int getProfundidadeMaximaDfs() { return profundidadeMaximaDfs; }
+    public void setProfundidadeMaximaDfs(int profundidadeMaximaDfs) {
+        this.profundidadeMaximaDfs = profundidadeMaximaDfs;
+    }
+
+    public double getToleranciaValorCiclo() { return toleranciaValorCiclo; }
+    public void setToleranciaValorCiclo(double toleranciaValorCiclo) {
+        this.toleranciaValorCiclo = toleranciaValorCiclo;
+    }
 }

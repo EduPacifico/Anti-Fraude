@@ -13,9 +13,15 @@ public class GrafoTransacional {
     // Contadores de grau para checagens de Fan-in e Fan-out
     private final Map<Integer, Integer> grausEntrada;
 
+    // Telemetria da última execução da Bounded DFS (Exploração de Limites)
+    private long ultimoNosVisitadosDfs;
+    private long ultimoArestasAvaliadasDfs;
+
     public GrafoTransacional() {
         this.adjacencias = new HashMap<>();
         this.grausEntrada = new HashMap<>();
+        this.ultimoNosVisitadosDfs = 0;
+        this.ultimoArestasAvaliadasDfs = 0;
     }
 
     // =========================================================================
@@ -72,6 +78,8 @@ public class GrafoTransacional {
                                         long timestampAtual, int profundidadeMaxima, double toleranciaValor) {
         List<Integer> caminhoAtual = new ArrayList<>();
         Set<Integer> visitados = new HashSet<>();
+        this.ultimoNosVisitadosDfs = 0;
+        this.ultimoArestasAvaliadasDfs = 0;
         
         caminhoAtual.add(destino);
 
@@ -98,6 +106,8 @@ public class GrafoTransacional {
     private boolean dfsLimitada(int noAtual, int alvo, long valorReferencia, long ultimoTimestamp, 
                                 long timestampTransacaoAtual, int profundidadeRestante, double toleranciaValor,
                                 Set<Integer> visitados, List<Integer> caminho) {
+        this.ultimoNosVisitadosDfs++;
+
         // Condição de sucesso: alcançou o nó alvo
         if (noAtual == alvo && caminho.size() > 1) {
             return true;
@@ -113,6 +123,7 @@ public class GrafoTransacional {
         List<ArestaTransacao> arestasSaindo = adjacencias.getOrDefault(noAtual, new ArrayList<>());
 
         for (ArestaTransacao aresta : arestasSaindo) {
+            this.ultimoArestasAvaliadasDfs++;
             int proximoNo = aresta.getIdContaDestino();
 
             // Poda 1: Evita revisitar nós dentro do mesmo ramo (exceto se for o alvo final)
@@ -167,5 +178,21 @@ public class GrafoTransacional {
 
     public int getGrauEntrada(int idConta) {
         return grausEntrada.getOrDefault(idConta, 0);
+    }
+
+    public long getUltimoNosVisitadosDfs() {
+        return ultimoNosVisitadosDfs;
+    }
+
+    public long getUltimoArestasAvaliadasDfs() {
+        return ultimoArestasAvaliadasDfs;
+    }
+
+    public int getTotalArestasAtivas() {
+        int total = 0;
+        for (List<ArestaTransacao> lista : adjacencias.values()) {
+            total += lista.size();
+        }
+        return total;
     }
 }

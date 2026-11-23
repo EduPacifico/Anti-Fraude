@@ -3,11 +3,19 @@ import java.util.List;
 
 public class JanelaDeslizante {
     private final List<Transacao> buffer;
-    private final long duracaoJanelaMs;
+    private long duracaoJanelaMs;
 
     public JanelaDeslizante(long duracaoJanelaMs) {
         this.duracaoJanelaMs = duracaoJanelaMs;
         this.buffer = new ArrayList<>();
+    }
+
+    public long getDuracaoJanelaMs() {
+        return duracaoJanelaMs;
+    }
+
+    public void setDuracaoJanelaMs(long duracaoJanelaMs) {
+        this.duracaoJanelaMs = duracaoJanelaMs;
     }
 
     public void adicionarTransacao(Transacao tx) {

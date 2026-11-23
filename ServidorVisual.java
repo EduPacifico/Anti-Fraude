@@ -56,6 +56,8 @@ public class ServidorVisual {
         
         // NOVO ENDPOINT: Teste de Stress
         server.createContext("/api/stress/run", new StressTestHandler());
+        // NOVO ENDPOINT: Laboratório de Exploração de Limites
+        server.createContext("/api/limites/run", new LimitesLabHandler());
 
         server.setExecutor(null);
 
@@ -191,6 +193,7 @@ public class ServidorVisual {
             "        <button class=\"chip\" onclick=\"mudarAba('ciclo', this)\">4. Grafo: Bounded DFS</button>\n" +
             "        <button class=\"chip\" onclick=\"mudarAba('fanin', this)\">5. Grafo: In-Degree</button>\n" +
             "        <button class=\"chip\" style=\"border-color:var(--done); color:var(--done);\" onclick=\"mudarAba('stress', this)\">6. Stress Test ⚡</button>\n" +
+            "        <button class=\"chip\" style=\"border-color:var(--pivot); color:var(--pivot);\" onclick=\"mudarAba('limites', this)\">7. Lab de Limites 🔬</button>\n" +
             "      </div>\n" +
             "    </div>\n" +
             "\n" +
@@ -221,6 +224,63 @@ public class ServidorVisual {
             "                     <div class=\"metric\" style=\"border-bottom:1px solid var(--line-soft);\"><span class=\"k\">Vazão (TPS)</span><span class=\"v success\" id=\"st-tps\">-</span></div>\n" +
             "                     <div class=\"metric\" style=\"border-right:1px solid var(--line-soft);\"><span class=\"k\">Volume Processado</span><span class=\"v\" id=\"st-total\">-</span></div>\n" +
             "                     <div class=\"metric\"><span class=\"k\">Fraudes Bloqueadas</span><span class=\"v danger\" id=\"st-blocks\">-</span></div>\n" +
+            "                 </div>\n" +
+            "             </div>\n" +
+            "             <!-- PAINEL DE LABORATORIO DE LIMITES -->\n" +
+            "             <div id=\"limites-container\" style=\"display:none; width:100%; height:100%; flex-direction:column; align-items:center; justify-content:center; padding:16px;\">\n" +
+            "                 <h2 style=\"font-family:var(--font-display); font-size:18px; margin:0 0 4px;\">Laboratório de Exploração de Limites & Trade-offs</h2>\n" +
+            "                 <p style=\"color:var(--ink-2); font-size:12px; margin:0 0 12px; text-align:center;\">Altere os hiperparâmetros das estruturas de dados e observe o impacto na detecção de anéis longos, memória da janela e custo da DFS.</p>\n" +
+            "                 <div style=\"display:grid; grid-template-columns:repeat(4, 1fr); gap:10px; width:100%; max-width:680px; margin-bottom:12px; text-align:left;\">\n" +
+            "                     <div style=\"background:var(--surface); border:1px solid var(--line); padding:8px 10px; border-radius:6px;\">\n" +
+            "                         <label style=\"font-family:var(--font-mono); font-size:10px; color:var(--ink-3); display:block;\">PROFUNDIDADE DFS (D_max)</label>\n" +
+            "                         <select id=\"lim-depth\" style=\"width:100%; margin-top:4px; background:var(--surface-2); color:var(--ink); border:1px solid var(--line); padding:5px; border-radius:4px; font-family:var(--font-mono);\">\n" +
+            "                             <option value=\"2\">D &le; 2 saltos</option>\n" +
+            "                             <option value=\"3\">D &le; 3 saltos</option>\n" +
+            "                             <option value=\"4\" selected>D &le; 4 (Padrão)</option>\n" +
+            "                             <option value=\"5\">D &le; 5 saltos</option>\n" +
+            "                             <option value=\"6\">D &le; 6 saltos</option>\n" +
+            "                             <option value=\"7\">D &le; 7 saltos</option>\n" +
+            "                             <option value=\"8\">D &le; 8 saltos</option>\n" +
+            "                         </select>\n" +
+            "                     </div>\n" +
+            "                     <div style=\"background:var(--surface); border:1px solid var(--line); padding:8px 10px; border-radius:6px;\">\n" +
+            "                         <label style=\"font-family:var(--font-mono); font-size:10px; color:var(--ink-3); display:block;\">JANELA TEMPORAL (&Delta;t)</label>\n" +
+            "                         <select id=\"lim-window\" style=\"width:100%; margin-top:4px; background:var(--surface-2); color:var(--ink); border:1px solid var(--line); padding:5px; border-radius:4px; font-family:var(--font-mono);\">\n" +
+            "                             <option value=\"1\">1 minuto</option>\n" +
+            "                             <option value=\"10\" selected>10 min (Padrão)</option>\n" +
+            "                             <option value=\"30\">30 minutos</option>\n" +
+            "                             <option value=\"60\">1 hora (60m)</option>\n" +
+            "                             <option value=\"360\">6 horas (360m)</option>\n" +
+            "                             <option value=\"1440\">24 horas</option>\n" +
+            "                         </select>\n" +
+            "                     </div>\n" +
+            "                     <div style=\"background:var(--surface); border:1px solid var(--line); padding:8px 10px; border-radius:6px;\">\n" +
+            "                         <label style=\"font-family:var(--font-mono); font-size:10px; color:var(--ink-3); display:block;\">TOLERÂNCIA VALOR (&plusmn;%)</label>\n" +
+            "                         <select id=\"lim-tol\" style=\"width:100%; margin-top:4px; background:var(--surface-2); color:var(--ink); border:1px solid var(--line); padding:5px; border-radius:4px; font-family:var(--font-mono);\">\n" +
+            "                             <option value=\"0.05\">&plusmn; 5% (Rígida)</option>\n" +
+            "                             <option value=\"0.10\">&plusmn; 10%</option>\n" +
+            "                             <option value=\"0.20\" selected>&plusmn; 20% (Padrão)</option>\n" +
+            "                             <option value=\"0.35\">&plusmn; 35%</option>\n" +
+            "                             <option value=\"0.50\">&plusmn; 50% (Frouxa)</option>\n" +
+            "                         </select>\n" +
+            "                     </div>\n" +
+            "                     <div style=\"background:var(--surface); border:1px solid var(--line); padding:8px 10px; border-radius:6px;\">\n" +
+            "                         <label style=\"font-family:var(--font-mono); font-size:10px; color:var(--ink-3); display:block;\">TAMANHO DO ANEL INJETADO</label>\n" +
+            "                         <select id=\"lim-ring\" style=\"width:100%; margin-top:4px; background:var(--surface-2); color:var(--ink); border:1px solid var(--line); padding:5px; border-radius:4px; font-family:var(--font-mono);\">\n" +
+            "                             <option value=\"3\">3 Contas (2 saltos)</option>\n" +
+            "                             <option value=\"4\">4 Contas (3 saltos)</option>\n" +
+            "                             <option value=\"5\">5 Contas (4 saltos)</option>\n" +
+            "                             <option value=\"6\" selected>6 Contas (5 saltos)</option>\n" +
+            "                             <option value=\"7\">7 Contas (6 saltos)</option>\n" +
+            "                         </select>\n" +
+            "                     </div>\n" +
+            "                 </div>\n" +
+            "                 <button class=\"btn-small\" id=\"btn-limites\" style=\"background:var(--pivot); color:#fff; padding:8px 18px; font-size:13px; margin-bottom:12px;\" onclick=\"rodarLabLimites()\">🔬 EXECUTAR SIMULAÇÃO DE LIMITES (20.000 Txs)</button>\n" +
+            "                 <div class=\"metrics\" style=\"width:100%; max-width:680px; grid-template-columns:repeat(4, 1fr); border:1px solid var(--line); border-radius:var(--radius); overflow:hidden; text-align:left;\">\n" +
+            "                     <div class=\"metric\" style=\"border-right:1px solid var(--line-soft);\"><span class=\"k\">Vazão (TPS)</span><span class=\"v success\" id=\"lim-tps\">-</span></div>\n" +
+            "                     <div class=\"metric\" style=\"border-right:1px solid var(--line-soft);\"><span class=\"k\">Arestas DFS / Tx</span><span class=\"v\" id=\"lim-arestas\">-</span></div>\n" +
+            "                     <div class=\"metric\" style=\"border-right:1px solid var(--line-soft);\"><span class=\"k\">Buffer Janela Ativo</span><span class=\"v warning\" id=\"lim-buffer\">-</span></div>\n" +
+            "                     <div class=\"metric\"><span class=\"k\">Anéis Detectados</span><span class=\"v danger\" id=\"lim-aneis\">-</span></div>\n" +
             "                 </div>\n" +
             "             </div>\n" +
             "          </div>\n" +
@@ -337,6 +397,15 @@ public class ServidorVisual {
             "         \"     Avaliação Janela Temporal\",\n" +
             "         \"  end = System.nanoTime();\",\n" +
             "         \"  retorna (N / segundos); // TPS\"\n" +
+            "      ],\n" +
+            "      'limites': [\n" +
+            "         \"LaboratorioLimites.simularCenario():\",\n" +
+            "         \"  motor = new MotorFraude(janelaMs, D_max, tol)\",\n" +
+            "         \"  Injeta anéis de N contas + tráfego denso\",\n" +
+            "         \"  BoundedDFS visita O(b^D) arestas\",\n" +
+            "         \"  Se D_max < (N - 1): FALSO NEGATIVO (Cego)\",\n" +
+            "         \"  Se D_max >= (N - 1): CICLO DETECTADO!\",\n" +
+            "         \"  Mede Latência (µs), Buffer e Arestas/Tx\"\n" +
             "      ]\n" +
             "    };\n" +
             "\n" +
@@ -358,25 +427,34 @@ public class ServidorVisual {
             "          const divControles = document.getElementById('controles-fluxo');\n" +
             "          const divBarra = document.getElementById('barra-transporte');\n" +
             "          if(divControles) divControles.style.display = (aba === 'fluxo') ? 'flex' : 'none';\n" +
-            "          if(divBarra) divBarra.style.display = (aba === 'fluxo' || aba === 'stress' || aba === 'contas') ? 'none' : 'flex';\n" +
+            "          if(divBarra) divBarra.style.display = (aba === 'fluxo' || aba === 'stress' || aba === 'limites' || aba === 'contas') ? 'none' : 'flex';\n" +
             "\n" +
             "          const mCanvas = document.getElementById('mainCanvas');\n" +
             "          const mTable = document.getElementById('table-container');\n" +
             "          const mStress = document.getElementById('stress-container');\n" +
+            "          const mLimites = document.getElementById('limites-container');\n" +
             "          \n" +
             "          if(aba === 'contas') {\n" +
             "             if(mCanvas) mCanvas.style.display = 'none';\n" +
             "             if(mTable) mTable.style.display = 'block';\n" +
             "             if(mStress) mStress.style.display = 'none';\n" +
+            "             if(mLimites) mLimites.style.display = 'none';\n" +
             "             carregarTabela(aba);\n" +
             "          } else if (aba === 'stress') {\n" +
             "             if(mCanvas) mCanvas.style.display = 'none';\n" +
             "             if(mTable) mTable.style.display = 'none';\n" +
             "             if(mStress) mStress.style.display = 'flex';\n" +
+            "             if(mLimites) mLimites.style.display = 'none';\n" +
+            "          } else if (aba === 'limites') {\n" +
+            "             if(mCanvas) mCanvas.style.display = 'none';\n" +
+            "             if(mTable) mTable.style.display = 'none';\n" +
+            "             if(mStress) mStress.style.display = 'none';\n" +
+            "             if(mLimites) mLimites.style.display = 'flex';\n" +
             "          } else {\n" +
             "             if(mCanvas) mCanvas.style.display = 'block';\n" +
             "             if(mTable) mTable.style.display = 'none';\n" +
             "             if(mStress) mStress.style.display = 'none';\n" +
+            "             if(mLimites) mLimites.style.display = 'none';\n" +
             "          }\n" +
             "          await resetCurrent();\n" +
             "      } catch(e) { console.error('Erro ao mudar aba:', e); }\n" +
@@ -446,8 +524,45 @@ public class ServidorVisual {
             "        btn.disabled = false;\n" +
             "    }\n" +
             "\n" +
+            "    async function rodarLabLimites() {\n" +
+            "        const d = document.getElementById('lim-depth').value;\n" +
+            "        const w = document.getElementById('lim-window').value;\n" +
+            "        const tol = document.getElementById('lim-tol').value;\n" +
+            "        const ring = document.getElementById('lim-ring').value;\n" +
+            "        const btn = document.getElementById('btn-limites');\n" +
+            "        btn.innerText = 'SIMULANDO LIMITES...';\n" +
+            "        btn.disabled = true;\n" +
+            "        try {\n" +
+            "            const res = await fetch(`/api/limites/run?depth=${d}&winMin=${w}&tol=${tol}&ring=${ring}`);\n" +
+            "            const data = await res.json();\n" +
+            "            document.getElementById('lim-tps').innerText = Math.round(data.throughput).toLocaleString('pt-BR');\n" +
+            "            document.getElementById('lim-arestas').innerText = data.mediaArestasDfs.toFixed(1);\n" +
+            "            document.getElementById('lim-buffer').innerText = data.bufferAtivo.toLocaleString('pt-BR') + ' txs';\n" +
+            "            document.getElementById('lim-aneis').innerText = data.ciclosDetectados > 0 ? `${data.ciclosDetectados} PEGO(S)` : '0 (CEGO)';\n" +
+            "            document.getElementById('lim-aneis').className = data.ciclosDetectados > 0 ? 'v success' : 'v danger';\n" +
+            "            document.getElementById('m-score').innerText = `${data.latenciaMediaUs.toFixed(2)} µs`;\n" +
+            "            document.getElementById('m-status').innerText = data.ciclosDetectados > 0 ? 'DETECTADO' : 'FALSO NEG.';\n" +
+            "            document.getElementById('m-status').className = data.ciclosDetectados > 0 ? 'v success' : 'v danger';\n" +
+            "            document.getElementById('m-extra').innerText = `P99: ${data.p99Us.toFixed(1)} µs`;\n" +
+            "            const saltosNecessarios = parseInt(ring) - 1;\n" +
+            "            let explicacao = `Com <b>D_max = ${d}</b>, <b>Janela = ${w} min</b> e <b>Tolerância = &plusmn;${Math.round(tol*100)}%</b>: `;\n" +
+            "            if (data.ciclosDetectados > 0) {\n" +
+            "                explicacao += `O motor <b>DETECTOU ${data.ciclosDetectados} anéis</b> de ${ring} contas (exige ${saltosNecessarios} saltos reversos), visitando em média <b>${data.mediaArestasDfs.toFixed(1)} arestas/tx</b> com latência média de <b>${data.latenciaMediaUs.toFixed(2)} µs</b>.`;\n" +
+            "                atualizarPseudocodigo('limites', 5);\n" +
+            "            } else {\n" +
+            "                explicacao += `<b>FALSO NEGATIVO!</b> Um anel de ${ring} contas exige <b>${saltosNecessarios} saltos</b> na busca reversa, mas a Bounded DFS foi interrompida em <b>D_max = ${d}</b>.`;\n" +
+            "                atualizarPseudocodigo('limites', 4);\n" +
+            "            }\n" +
+            "            document.getElementById('narrative-text').innerHTML = explicacao;\n" +
+            "        } catch (e) {\n" +
+            "            document.getElementById('narrative-text').innerText = 'Erro ao rodar simulação de limites.';\n" +
+            "        }\n" +
+            "        btn.innerText = '🔬 EXECUTAR SIMULAÇÃO DE LIMITES (20.000 Txs)';\n" +
+            "        btn.disabled = false;\n" +
+            "    }\n" +
+            "\n" +
             "    async function nextStep() {\n" +
-            "      if (abaAtual === 'contas' || abaAtual === 'stress') return;\n" +
+            "      if (abaAtual === 'contas' || abaAtual === 'stress' || abaAtual === 'limites') return;\n" +
             "      if (isProcessing) return; \n" +
             "      isProcessing = true;\n" +
             "      \n" +
@@ -511,7 +626,7 @@ public class ServidorVisual {
             "\n" +
             "    async function resetCurrent() {\n" +
             "      if (abaAtual === 'contas') return;\n" +
-            "      if (abaAtual !== 'stress') {\n" +
+            "      if (abaAtual !== 'stress' && abaAtual !== 'limites') {\n" +
             "          try { await fetch(`/api/${abaAtual}/reset`); } catch (e) { console.error(e); }\n" +
             "      }\n" +
             "      \n" +
@@ -542,7 +657,7 @@ public class ServidorVisual {
             "    }\n" +
             "\n" +
             "    function desenharGrafoAtual() {\n" +
-            "        if(abaAtual === 'contas' || abaAtual === 'stress') return;\n" +
+            "        if(abaAtual === 'contas' || abaAtual === 'stress' || abaAtual === 'limites') return;\n" +
             "        const canvas = document.getElementById('mainCanvas');\n" +
             "        if (!canvas) return;\n" +
             "        const ctx = canvas.getContext('2d');\n" +
@@ -836,6 +951,53 @@ public class ServidorVisual {
                 .append("}");
 
             byte[] bytes = json.toString().getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set("Content-Type", "application/json; charset=UTF-8");
+            exchange.getResponseHeaders().set("Cache-Control", "no-cache");
+            exchange.sendResponseHeaders(200, bytes.length);
+            OutputStream os = exchange.getResponseBody();
+            os.write(bytes);
+            os.close();
+        }
+    }
+
+    // =========================================================================
+    // NOVO: ENDPOINT DO LABORATORIO DE EXPLORACAO DE LIMITES
+    // =========================================================================
+    static class LimitesLabHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            String query = exchange.getRequestURI().getQuery();
+            int depth = 4;
+            long winMin = 10;
+            double tol = 0.20;
+            int ring = 6;
+
+            if (query != null) {
+                for (String param : query.split("&")) {
+                    String[] kv = param.split("=");
+                    if (kv.length == 2) {
+                        try {
+                            if (kv[0].equals("depth")) depth = Integer.parseInt(kv[1]);
+                            if (kv[0].equals("winMin")) winMin = Long.parseLong(kv[1]);
+                            if (kv[0].equals("tol")) tol = Double.parseDouble(kv[1]);
+                            if (kv[0].equals("ring")) ring = Integer.parseInt(kv[1]);
+                        } catch (Exception ignored) {}
+                    }
+                }
+            }
+
+            LaboratorioLimites.ResultadoSimulacao res = LaboratorioLimites.executarSimulacaoCustomizada(
+                    20_000, winMin * 60 * 1000L, depth, tol, ring
+            );
+
+            String json = String.format(Locale.US,
+                    "{\"volume\":%d,\"tempoMs\":%.2f,\"throughput\":%.2f,\"latenciaMediaUs\":%.2f,\"p99Us\":%.2f," +
+                    "\"mediaArestasDfs\":%.2f,\"ciclosDetectados\":%d,\"bufferAtivo\":%d,\"arestasAtivas\":%d}",
+                    res.volume, res.tempoTotalMs, res.throughput, res.latenciaMediaUs, res.p99Us,
+                    res.mediaArestasDfsPorTx, res.ciclosDetectados, res.bufferAtivoFinal, res.arestasAtivasFinal
+            );
+
+            byte[] bytes = json.getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().set("Content-Type", "application/json; charset=UTF-8");
             exchange.getResponseHeaders().set("Cache-Control", "no-cache");
             exchange.sendResponseHeaders(200, bytes.length);
