@@ -6,6 +6,8 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -58,13 +60,15 @@ public class ServidorVisual {
         server.createContext("/api/stress/run", new StressTestHandler());
         // NOVO ENDPOINT: Laboratório de Exploração de Limites
         server.createContext("/api/limites/run", new LimitesLabHandler());
+        // NOVO ENDPOINT: Slides Interativos da Apresentação Acadêmica
+        server.createContext("/apresentacao", new ApresentacaoHandler());
 
         server.setExecutor(null);
 
         System.out.println("=================================================================");
-        System.out.println(" Servidor Visual Iniciado (Com Dashboard de Stress Test)!");
-        System.out.println(" Acesse no navegador: http://localhost:8080");
-        System.out.println(" Lembre-se de dar Ctrl+F5 no navegador!");
+        System.out.println(" Servidor Visual Iniciado (Bancada + Modo Apresentacao)!");
+        System.out.println(" -> Bancada Ao Vivo:      http://localhost:8080");
+        System.out.println(" -> Slides Apresentacao:  http://localhost:8080/apresentacao");
         System.out.println("=================================================================");
         server.start();
     }
@@ -180,7 +184,10 @@ public class ServidorVisual {
             "    <header class=\"top\">\n" +
             "      <h1 class=\"wordmark\">Motor Antifraude<span class=\"dot\">.</span></h1>\n" +
             "      <p class=\"tagline\">Análise de risco em grafos, árvores e janelas temporais passo a passo.</p>\n" +
-            "      <button class=\"theme-btn\" id=\"theme-toggle\" type=\"button\">Modo Claro / Escuro</button>\n" +
+            "      <div style=\"display:flex; gap:8px; align-items:center;\">\n" +
+            "        <a href=\"/apresentacao\" class=\"theme-btn\" style=\"background:var(--accent); color:var(--accent-ink); border-color:var(--accent); font-weight:600; text-decoration:none;\">🎓 Modo Apresentação (Slides)</a>\n" +
+            "        <button class=\"theme-btn\" id=\"theme-toggle\" type=\"button\">Modo Claro / Escuro</button>\n" +
+            "      </div>\n" +
             "    </header>\n" +
             "\n" +
             "    <div class=\"picker\">\n" +
@@ -767,7 +774,13 @@ public class ServidorVisual {
             "      box.innerHTML = h;\n" +
             "    }\n" +
             "\n" +
-            "    window.onload = () => { mudarAba('fluxo', document.querySelector('.chip')); };\n" +
+            "    window.onload = () => {\n" +
+            "      const params = new URLSearchParams(window.location.search);\n" +
+            "      const abaParam = params.get('aba') || 'fluxo';\n" +
+            "      const chips = Array.from(document.querySelectorAll('.chip'));\n" +
+            "      const chipAlvo = chips.find(c => (c.getAttribute('onclick') || '').includes(`'${abaParam}'`)) || chips[0];\n" +
+            "      mudarAba(abaParam, chipAlvo);\n" +
+            "    };\n" +
             "  </script>\n" +
             "</body>\n" +
             "</html>";
@@ -777,6 +790,22 @@ public class ServidorVisual {
             exchange.getResponseHeaders().set("Cache-Control", "no-cache, no-store, must-revalidate");
             exchange.getResponseHeaders().set("Pragma", "no-cache");
             exchange.getResponseHeaders().set("Expires", "0");
+            exchange.sendResponseHeaders(200, bytes.length);
+            OutputStream os = exchange.getResponseBody();
+            os.write(bytes);
+            os.close();
+        }
+    }
+
+    // =========================================================================
+    // HANDLER SLIDES DA APRESENTACAO ACADEMICA (/apresentacao)
+    // =========================================================================
+    static class ApresentacaoHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            byte[] bytes = Files.readAllBytes(Paths.get("apresentacao.html"));
+            exchange.getResponseHeaders().set("Content-Type", "text/html; charset=UTF-8");
+            exchange.getResponseHeaders().set("Cache-Control", "no-cache, no-store, must-revalidate");
             exchange.sendResponseHeaders(200, bytes.length);
             OutputStream os = exchange.getResponseBody();
             os.write(bytes);
