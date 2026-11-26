@@ -22,6 +22,9 @@ public class SuiteTestes {
         executar("6. Deteccao de Explosao de Velocidade Temporal (Burst)", SuiteTestes::testarExplosaoVelocidade);
         executar("7. Expurgo Temporal de Arestas e Transacoes Expiradas", SuiteTestes::testarExpurgoTemporal);
         executar("8. Imutabilidade e Integridade Criptografica da Arvore de Merkle", SuiteTestes::testarArvoreMerkle);
+        executar("9. Limite de Profundidade da Bounded DFS (Anel de 6 Contas: D=4 vs D=5)", SuiteTestes::testarLimiteProfundidadeDfs);
+        executar("10. Limite da Janela Deslizante (Smurfing Lento: 10 min vs 60 min)", SuiteTestes::testarLimiteJanelaLonga);
+        executar("11. Sensibilidade da Poda de Valor na DFS (Tolerancia 10% vs 35%)", SuiteTestes::testarLimiteToleranciaValor);
 
         long duracao = System.currentTimeMillis() - inicio;
 
@@ -185,6 +188,83 @@ public class SuiteTestes {
         ArvoreMerkle arvoreAdulterada = new ArvoreMerkle(loteAdulterado);
         afirmar(!arvore1.getRaizMerkle().equals(arvoreAdulterada.getRaizMerkle()), 
                 "Adulteracao de 1 centavo DEVE alterar completamente a Raiz Merkle");
+    }
+
+    private static void testarLimiteProfundidadeDfs() {
+        // Anel longo de 6 contas: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 1 (exige 5 saltos na busca reversa de 1 ate 6)
+        MotorFraude motorD4 = new MotorFraude(JANELA_10_MIN, 4, 0.20);
+        MotorFraude motorD5 = new MotorFraude(JANELA_10_MIN, 5, 0.20);
+
+        for (int c = 1; c <= 6; c++) {
+            motorD4.getTreapContas().obterOuCriar(c, 500_000_00L, 50_000_00L);
+            motorD5.getTreapContas().obterOuCriar(c, 500_000_00L, 50_000_00L);
+        }
+
+        long t0 = 1_700_000_000_000L;
+        for (int i = 1; i <= 5; i++) {
+            motorD4.processarTransacao(new Transacao(8000L + i, i, i + 1, 50_000_00L, t0 + (i * 1000L)));
+            motorD5.processarTransacao(new Transacao(8000L + i, i, i + 1, 50_000_00L, t0 + (i * 1000L)));
+        }
+
+        // Perna de fecho: 6 -> 1
+        Transacao fechoD4 = motorD4.processarTransacao(new Transacao(8006L, 6, 1, 50_000_00L, t0 + 6000L));
+        Transacao fechoD5 = motorD5.processarTransacao(new Transacao(8006L, 6, 1, 50_000_00L, t0 + 6000L));
+
+        afirmar(!fechoD4.getMotivoFraude().contains("ANEL_LAVAGEM_CICLO_DETECTADO"),
+                "Com D_max = 4, o anel de 6 contas nao deve ser alcancado (exige 5 saltos)");
+        afirmar(fechoD5.getStatus() == StatusTransacao.BLOQUEADA && fechoD5.getMotivoFraude().contains("ANEL_LAVAGEM_CICLO_DETECTADO"),
+                "Com D_max = 5, o anel de 6 contas DEVE ser detectado e bloqueado");
+    }
+
+    private static void testarLimiteJanelaLonga() {
+        long janela1Hora = 60 * 60 * 1000L;
+        MotorFraude motor10Min = new MotorFraude(JANELA_10_MIN, 4, 0.20);
+        MotorFraude motor60Min = new MotorFraude(janela1Hora, 4, 0.20);
+
+        motor10Min.getTreapContas().obterOuCriar(15, 200_000_00L, 10_000_00L);
+        motor60Min.getTreapContas().obterOuCriar(15, 200_000_00L, 10_000_00L);
+
+        long t0 = 1_700_000_000_000L;
+        long intervalo12Min = 12 * 60 * 1000L;
+        Transacao ultima10Min = null;
+        Transacao ultima60Min = null;
+
+        // 5 transferências de R$ 9.600 espaçadas a cada 12 minutos (total 48 minutos)
+        for (int i = 0; i < 5; i++) {
+            long ts = t0 + (i * intervalo12Min);
+            ultima10Min = motor10Min.processarTransacao(new Transacao(8100L + i, 15, 40, 9_600_00L, ts));
+            ultima60Min = motor60Min.processarTransacao(new Transacao(8100L + i, 15, 40, 9_600_00L, ts));
+        }
+
+        afirmar(!ultima10Min.getMotivoFraude().contains("SMURFING"),
+                "Na janela de 10 min, parcelas espacadas a cada 12 min expiram individualmente");
+        afirmar(ultima60Min.getMotivoFraude().contains("SMURFING"),
+                "Na janela de 60 min (1 hora), o Smurfing lento DEVE ser acumulado e detectado");
+    }
+
+    private static void testarLimiteToleranciaValor() {
+        MotorFraude motorRigido = new MotorFraude(JANELA_10_MIN, 4, 0.10); // ±10%
+        MotorFraude motorFlexivel = new MotorFraude(JANELA_10_MIN, 4, 0.35); // ±35%
+
+        for (int c : new int[]{10, 20, 30}) {
+            motorRigido.getTreapContas().obterOuCriar(c, 500_000_00L, 50_000_00L);
+            motorFlexivel.getTreapContas().obterOuCriar(c, 500_000_00L, 50_000_00L);
+        }
+
+        long t0 = 1_700_000_000_000L;
+        // Laranjas descontam ~12% de comissão a cada salto: 50k -> 44k -> 39k
+        motorRigido.processarTransacao(new Transacao(8201L, 10, 20, 50_000_00L, t0));
+        motorRigido.processarTransacao(new Transacao(8202L, 20, 30, 44_000_00L, t0 + 1000L));
+        Transacao fechoRigido = motorRigido.processarTransacao(new Transacao(8203L, 30, 10, 39_000_00L, t0 + 2000L));
+
+        motorFlexivel.processarTransacao(new Transacao(8201L, 10, 20, 50_000_00L, t0));
+        motorFlexivel.processarTransacao(new Transacao(8202L, 20, 30, 44_000_00L, t0 + 1000L));
+        Transacao fechoFlexivel = motorFlexivel.processarTransacao(new Transacao(8203L, 30, 10, 39_000_00L, t0 + 2000L));
+
+        afirmar(!fechoRigido.getMotivoFraude().contains("ANEL_LAVAGEM_CICLO_DETECTADO"),
+                "Tolerancia rigida de 10% poda o ramo quando a comissao total acumulada supera 10%");
+        afirmar(fechoFlexivel.getMotivoFraude().contains("ANEL_LAVAGEM_CICLO_DETECTADO"),
+                "Tolerancia de 35% absorve a comissao dos laranjas e detecta o anel");
     }
 
     private static void executar(String nomeTeste, Runnable teste) {

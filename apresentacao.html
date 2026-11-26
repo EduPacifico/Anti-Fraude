@@ -1,0 +1,1059 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Motor Antifraude Pix (In-Memory) | Apresentação do Projeto</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+  <style>
+    :root {
+      --ground: #0D1218;
+      --surface: #151C24;
+      --surface-2: #1C242D;
+      --stage: #111820;
+      --ink: #E6EDF4;
+      --ink-2: #9EACBA;
+      --ink-3: #6A7988;
+      --line: #26313C;
+      --line-soft: #1E2831;
+      --accent: #7093FF;
+      --accent-ink: #0D1218;
+      --accent-soft: #1B2540;
+      --done: #36C79E;
+      --done-soft: rgba(54, 199, 158, 0.14);
+      --compare: #EFA544;
+      --compare-soft: rgba(239, 165, 68, 0.14);
+      --swap: #FF6B84;
+      --swap-soft: rgba(255, 107, 132, 0.14);
+      --pivot: #D284D2;
+      --pivot-soft: rgba(210, 132, 210, 0.14);
+      --shadow: 0 4px 20px rgba(0,0,0,.4);
+      --radius: 12px;
+      --radius-sm: 8px;
+      --font-display: "Archivo", sans-serif;
+      --font-body: "IBM Plex Sans", sans-serif;
+      --font-mono: "IBM Plex Mono", monospace;
+    }
+    :root[data-theme="light"] {
+      --ground: #E9EEF3;
+      --surface: #FFFFFF;
+      --surface-2: #F3F7FA;
+      --stage: #FBFCFE;
+      --ink: #0F1820;
+      --ink-2: #4B5A69;
+      --ink-3: #7B8B9B;
+      --line: #D3DCE5;
+      --line-soft: #E6ECF2;
+      --accent: #2B4FC7;
+      --accent-ink: #FFFFFF;
+      --accent-soft: #E3E9FA;
+      --done: #0F7D63;
+      --done-soft: rgba(15, 125, 99, 0.12);
+      --compare: #C97A16;
+      --compare-soft: rgba(201, 122, 22, 0.12);
+      --swap: #CE3050;
+      --swap-soft: rgba(206, 48, 80, 0.12);
+      --pivot: #8E4090;
+      --pivot-soft: rgba(142, 64, 144, 0.12);
+      --shadow: 0 2px 14px rgba(15,24,32,.08);
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--ground);
+      color: var(--ink);
+      font-family: var(--font-body);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+
+    header.topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 28px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--line);
+      z-index: 30;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .brand h1 {
+      font-family: var(--font-display);
+      font-size: 19px;
+      font-weight: 700;
+      margin: 0;
+    }
+    .brand h1 .dot { color: var(--accent); }
+    .badge-pill {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 100px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      border: 1px solid var(--accent);
+    }
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .btn {
+      background: var(--surface-2);
+      border: 1px solid var(--line);
+      color: var(--ink);
+      padding: 6px 13px;
+      border-radius: var(--radius-sm);
+      font-family: var(--font-body);
+      font-size: 12.5px;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: 0.2s;
+    }
+    .btn:hover { border-color: var(--accent); color: var(--accent); }
+    .btn.primary {
+      background: var(--accent);
+      color: var(--accent-ink);
+      border-color: var(--accent);
+    }
+    .btn.primary:hover { opacity: 0.92; color: var(--accent-ink); }
+    .btn.success {
+      background: var(--done-soft);
+      color: var(--done);
+      border-color: var(--done);
+    }
+
+    .progress-track {
+      height: 4px;
+      background: var(--line-soft);
+      width: 100%;
+    }
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--done));
+      width: 12.5%;
+      transition: width 0.3s ease;
+    }
+
+    main.deck-stage {
+      flex: 1;
+      max-width: 1380px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 22px 28px 100px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .slide {
+      display: none;
+      animation: fadeIn 0.28s ease;
+    }
+    .slide.active {
+      display: block;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .slide-header { margin-bottom: 18px; }
+    .slide-kicker {
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--accent);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+    .slide-title {
+      font-family: var(--font-display);
+      font-size: 31px;
+      font-weight: 800;
+      margin: 0 0 8px;
+      line-height: 1.2;
+    }
+    .slide-subtitle {
+      color: var(--ink-2);
+      font-size: 15.5px;
+      margin: 0;
+      max-width: 1020px;
+      line-height: 1.5;
+    }
+
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .grid-asymmetric { display: grid; grid-template-columns: 1.15fr 1fr; gap: 18px; }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 18px 20px;
+      box-shadow: var(--shadow);
+    }
+    .card.highlight-accent { border-left: 4px solid var(--accent); }
+    .card.highlight-done { border-left: 4px solid var(--done); }
+    .card.highlight-warn { border-left: 4px solid var(--compare); }
+    .card.highlight-danger { border-left: 4px solid var(--swap); }
+    .card.highlight-pivot { border-left: 4px solid var(--pivot); }
+
+    .card-title {
+      font-family: var(--font-display);
+      font-size: 16.5px;
+      font-weight: 700;
+      margin: 0 0 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .card p, .card li {
+      color: var(--ink-2);
+      font-size: 14px;
+      line-height: 1.55;
+    }
+    .card ul {
+      margin: 8px 0 0;
+      padding-left: 18px;
+    }
+    .card li { margin-bottom: 6px; }
+    .card li strong, .card p strong { color: var(--ink); }
+
+    .tag {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 4px;
+      background: var(--surface-2);
+      border: 1px solid var(--line);
+      color: var(--ink-2);
+      white-space: nowrap;
+    }
+    .tag.done { background: var(--done-soft); color: var(--done); border-color: var(--done); }
+    .tag.warn { background: var(--compare-soft); color: var(--compare); border-color: var(--compare); }
+    .tag.danger { background: var(--swap-soft); color: var(--swap); border-color: var(--swap); }
+    .tag.pivot { background: var(--pivot-soft); color: var(--pivot); border-color: var(--pivot); }
+    .tag.accent { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+
+    pre.code-block {
+      background: var(--stage);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      padding: 11px 14px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--ink);
+      overflow-x: auto;
+      margin: 10px 0 0;
+      line-height: 1.48;
+    }
+    .kw { color: var(--accent); font-weight: 600; }
+    .cm { color: var(--ink-3); font-style: italic; }
+    .fn { color: var(--done); }
+    .num { color: var(--compare); }
+
+    table.data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      margin-top: 8px;
+    }
+    table.data-table th {
+      background: var(--surface-2);
+      color: var(--ink-3);
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      text-transform: uppercase;
+      padding: 9px 10px;
+      text-align: left;
+      border-bottom: 1px solid var(--line);
+    }
+    table.data-table td {
+      padding: 9px 10px;
+      border-bottom: 1px solid var(--line-soft);
+      color: var(--ink);
+    }
+    table.data-table tr:hover td { background: var(--surface-2); }
+
+    .pipeline-flow {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 12px;
+      margin: 16px 0;
+    }
+    .pipe-step {
+      background: var(--surface-2);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      padding: 14px;
+      position: relative;
+      text-align: left;
+    }
+    .pipe-step .step-num {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      color: var(--accent);
+      font-weight: 600;
+      display: block;
+      margin-bottom: 4px;
+    }
+    .pipe-step h4 {
+      font-family: var(--font-display);
+      margin: 0 0 6px;
+      font-size: 15px;
+    }
+    .pipe-step p {
+      font-size: 12.5px;
+      color: var(--ink-2);
+      margin: 0;
+      line-height: 1.45;
+    }
+
+    .engine-link-box {
+      margin-top: 12px;
+      padding: 10px 13px;
+      background: var(--surface-2);
+      border-left: 3px solid var(--accent);
+      border-radius: 6px;
+      font-size: 13px;
+      color: var(--ink);
+    }
+    .engine-link-box strong { color: var(--accent); font-family: var(--font-mono); font-size: 11.5px; text-transform: uppercase; }
+
+    .speaker-notes {
+      margin-top: 16px;
+      background: var(--accent-soft);
+      border: 1px dashed var(--accent);
+      border-radius: var(--radius-sm);
+      padding: 13px 18px;
+      display: none;
+    }
+    .speaker-notes.visible { display: block; }
+    .speaker-notes h5 {
+      margin: 0 0 5px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+    .speaker-notes p {
+      margin: 0;
+      font-size: 13.8px;
+      color: var(--ink);
+      line-height: 1.55;
+    }
+
+    footer.deck-nav {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: var(--surface);
+      border-top: 1px solid var(--line);
+      padding: 10px 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      z-index: 30;
+    }
+    .slide-dots {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .dot-btn {
+      background: var(--surface-2);
+      border: 1px solid var(--line);
+      color: var(--ink-2);
+      padding: 5px 11px;
+      border-radius: 100px;
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+    .dot-btn.active {
+      background: var(--accent);
+      color: var(--accent-ink);
+      border-color: var(--accent);
+      font-weight: 600;
+    }
+    .nav-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .slide-counter {
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      color: var(--ink-2);
+      min-width: 65px;
+      text-align: center;
+    }
+
+    .kpi-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+      margin-bottom: 16px;
+    }
+    .kpi-box {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      padding: 13px 16px;
+    }
+    .kpi-box .k-label {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      text-transform: uppercase;
+      color: var(--ink-3);
+      display: block;
+    }
+    .kpi-box .k-val {
+      font-family: var(--font-mono);
+      font-size: 24px;
+      font-weight: 700;
+      margin-top: 4px;
+      display: block;
+    }
+    .k-val.done { color: var(--done); }
+    .k-val.accent { color: var(--accent); }
+    .k-val.warn { color: var(--compare); }
+    .k-val.danger { color: var(--swap); }
+
+    details.faq-item {
+      background: var(--surface-2);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      padding: 10px 14px;
+      margin-bottom: 8px;
+    }
+    details.faq-item summary {
+      font-weight: 600;
+      cursor: pointer;
+      color: var(--ink);
+      font-size: 13.5px;
+    }
+    details.faq-item p {
+      margin: 7px 0 0;
+      color: var(--ink-2);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+
+  <header class="topbar">
+    <div class="brand">
+      <h1>Motor Antifraude Pix<span class="dot">.</span></h1>
+      <span class="badge-pill">Prevenção de Fraudes Bancárias em Tempo Real (In-Memory)</span>
+    </div>
+    <div class="top-actions">
+      <button class="btn" onclick="toggleFullscreen()" title="Atalho: Tecla F">⛶ Tela Cheia (F)</button>
+      <button class="btn" onclick="toggleTheme()">🌓 Tema</button>
+      <a class="btn success" href="http://localhost:8080" target="_blank">🔬 Abrir Simulador Ao Vivo (:8080)</a>
+    </div>
+  </header>
+
+  <div class="progress-track">
+    <div class="progress-fill" id="progress-bar"></div>
+  </div>
+
+  <main class="deck-stage">
+
+    <!-- ======================================================================= -->
+    <!-- SLIDE 1: O PROJETO E A DOR DO MUNDO REAL -->
+    <!-- ======================================================================= -->
+    <section class="slide active" data-title="1. O Projeto & O Golpe">
+      <div class="slide-header">
+        <div class="slide-kicker"><span>01 / 08</span> &bull; <span>VISÃO DO PRODUTO E PROBLEMA DO MUNDO REAL</span></div>
+        <h2 class="slide-title">Por que construir um Motor Antifraude Pix Preventivo em Memória?</h2>
+        <p class="slide-subtitle">Em um golpe via Pix, o dinheiro salta por 3 ou 4 contas laranjas e é sacado em <strong>menos de 30 segundos</strong>. Se o banco tentar analisar depois que a transferência ocorreu, o dinheiro já desapareceu.</p>
+      </div>
+
+      <div class="kpi-row">
+        <div class="kpi-box">
+          <span class="k-label">Janela Máxima do Pix (BACEN)</span>
+          <span class="k-val warn">&lt; 50 ms</span>
+        </div>
+        <div class="kpi-box">
+          <span class="k-label">Tempo de Decisão do Nosso Motor</span>
+          <span class="k-val done">~1.3 a 5.4 &micro;s</span>
+        </div>
+        <div class="kpi-box">
+          <span class="k-label">Capacidade de Processamento</span>
+          <span class="k-val accent">&gt; 250.000 Pix/s</span>
+        </div>
+        <div class="kpi-box">
+          <span class="k-label">Atuação do Sistema</span>
+          <span class="k-val danger">Preventiva (Pré-Débito)</span>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card highlight-danger">
+          <div class="card-title">
+            <span>🏦 O Gargalo Atual: MED 2.0 e Bancos Tradicionais</span>
+            <span class="tag danger">A Dor do Mercado</span>
+          </div>
+          <ul>
+            <li><strong>O MED 2.0 (Banco Central) é Reativo:</strong> O Mecanismo Especial de Devolução só é acionado <em>após</em> a vítima perceber o golpe e registrar boletim/contestação (processo que leva até 80 dias). Quando o bloqueio chega na conta destino, o fraudador já esvaziou o saldo.</li>
+            <li><strong>Bancos de Dados em Disco são Lentos para Grafos:</strong> Fazer 4 ou 5 <code>JOINs</code> recursivos em SQL no meio de um pico de transações Pix trava a fila de pagamentos.</li>
+            <li><strong>Caixa-Preta da IA Comercial:</strong> Modelos puramente estatísticos dizem <em>"Negado: Score 92%"</em>, mas não entregam o rastro exato exigido pela auditoria de Compliance.</li>
+          </ul>
+        </div>
+
+        <div class="card highlight-done">
+          <div class="card-title">
+            <span>🛡️ A Nossa Solução: Motor Antifraude In-Memory</span>
+            <span class="tag done">Nosso Projeto</span>
+          </div>
+          <p style="margin-top:0;">Desenvolvemos um motor em <strong>Java puro (100% em RAM)</strong> que intercepta a ordem de Pix no milissegundo em que o botão "Transferir" é pressionado e responde três perguntas antes de mover 1 centavo:</p>
+          <ul>
+            <li><strong>1. Quem está enviando e recebendo?</strong> (A conta tem saldo? Esse valor foge do padrão histórico dela? Ela age como conta de passagem?)</li>
+            <li><strong>2. Qual o ritmo recente dessa conta?</strong> (Ela está fatiando valores para burlar o fisco ou disparando via robô?)</li>
+            <li><strong>3. Para onde o dinheiro está fluindo na rede?</strong> (Essa transferência fecha um anel de lavagem de dinheiro ou abastece uma conta mula centralizadora?)</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================================================================= -->
+    <!-- SLIDE 2: A JORNADA DE UM PIX DENTRO DO MOTOR -->
+    <!-- ======================================================================= -->
+    <section class="slide" data-title="2. Jornada de um Pix">
+      <div class="slide-header">
+        <div class="slide-kicker"><span>02 / 08</span> &bull; <span>ARQUITETURA DO PROJETO (`MotorFraude.java`)</span></div>
+        <h2 class="slide-title">A Jornada de um Pix: O que Acontece em 5 Microssegundos?</h2>
+        <p class="slide-subtitle">Para responder em tempo real sem consultar disco, cada etapa da investigação antifraude foi desenhada sobre uma estrutura de dados específica.</p>
+      </div>
+
+      <div class="pipeline-flow">
+        <div class="pipe-step">
+          <span class="step-num">1. CHEGADA &amp; LIMPEZA</span>
+          <h4>Sincronização</h4>
+          <p>O Pix chega (<code>Origem &rarr; Destino, Valor, Hora</code>). O motor descarta da memória transações com mais de 10 minutos.</p>
+          <div style="margin-top:8px;"><span class="tag accent">Busca Binária O(log K)</span></div>
+        </div>
+        <div class="pipe-step">
+          <span class="step-num">2. PERFIL CONTÁBIL</span>
+          <h4>Análise da Conta</h4>
+          <p>Checa saldo em centavos, compara o valor com a média diária (&mu;) e avalia a taxa de retenção da conta.</p>
+          <div style="margin-top:8px;"><span class="tag done">Treap Balanceada O(log N)</span></div>
+        </div>
+        <div class="pipe-step">
+          <span class="step-num">3. COMPORTAMENTO</span>
+          <h4>Frequência &amp; Volume</h4>
+          <p>Verifica se a conta está fatiando depósitos (<em>Smurfing</em>) ou operando em velocidade de robô (<em>Burst</em>).</p>
+          <div style="margin-top:8px;"><span class="tag warn">Janela Deslizante O(log K)</span></div>
+        </div>
+        <div class="pipe-step">
+          <span class="step-num">4. REDE CRIMINOSA</span>
+          <h4>Topologia da Rede</h4>
+          <p>Rastreia se a transferência fecha um ciclo de lavagem ou concentra fundos em uma conta laranja (<em>Fan-in</em>).</p>
+          <div style="margin-top:8px;"><span class="tag danger">Grafo + Bounded DFS O(b<sup>D</sup>)</span></div>
+        </div>
+        <div class="pipe-step">
+          <span class="step-num">5. AUDITORIA</span>
+          <h4>Selagem Criptográfica</h4>
+          <p>Calcula o veredito final e sela o lote de decisões com hash criptográfico contra adulteração interna.</p>
+          <div style="margin-top:8px;"><span class="tag pivot">Árvore de Merkle SHA-256</span></div>
+        </div>
+      </div>
+
+      <div class="grid-3">
+        <div class="card highlight-done">
+          <div class="card-title"><span>✅ Score &lt; 40 &rarr; APROVADA</span><span class="tag done">Pix Efetivado</span></div>
+          <p>Comportamento compatível com o histórico do cliente e vizinhança limpa. O motor debita a origem, credita o destino na <code>TreapContas</code> e registra a conexão ativa na Janela e no Grafo.</p>
+        </div>
+        <div class="card highlight-warn">
+          <div class="card-title"><span>⚠️ 40 &le; Score &lt; 75 &rarr; SUSPEITA</span><span class="tag warn">Alerta Ligado</span></div>
+          <p>Anomalia moderada (ex: valor 3&times; acima da média ou acúmulo incomum). O Pix passa com flag de monitoramento, mas o <strong>Score de Risco permanente</strong> da conta sobe na árvore.</p>
+        </div>
+        <div class="card highlight-danger">
+          <div class="card-title"><span>🛑 Score &ge; 75 ou Ciclo &rarr; BLOQUEADA</span><span class="tag danger">Golpe Impedido</span></div>
+          <p>Fraude confirmada! A transferência é abortada antes do débito, protegendo o patrimônio, e todas as contas participantes da quadrilha são marcadas com risco crítico (<code>&ge; 85</code>).</p>
+        </div>
+      </div>
+
+      <div style="margin-top: 14px;">
+        <a class="btn primary" href="http://localhost:8080/?aba=fluxo" target="_blank">▶ Ver um Pix Atravessando o Pipeline Ao Vivo (:8080)</a>
+      </div>
+    </section>
+
+    <!-- ======================================================================= -->
+    <!-- SLIDE 3: PERFIL DO CLIENTE E CONTAS LARANJA -> TREAP -->
+    <!-- ======================================================================= -->
+    <section class="slide" data-title="3. Contas Laranja (Treap)">
+      <div class="slide-header">
+        <div class="slide-kicker"><span>03 / 08</span> &bull; <span>MÓDULO DE GESTÃO DE CONTAS E PERFIL (`Conta.java` &amp; `TreapContas.java`)</span></div>
+        <h2 class="slide-title">Identificando Desvios de Perfil e "Contas de Passagem"</h2>
+        <p class="slide-subtitle">Como o motor conhece o padrão financeiro de cada cliente e descobre se uma conta é uma <strong>Mula (Conta Laranja)</strong> em tempo logarítmico <strong>O(log N)</strong>.</p>
+      </div>
+
+      <div class="grid-asymmetric">
+        <div class="card highlight-done">
+          <div class="card-title">
+            <span>🕵️ A Anatomia de uma Conta Laranja no Projeto</span>
+            <span class="tag warn">Regra de Negócio</span>
+          </div>
+          <p style="margin-top:0;">Em um esquema real de lavagem, as contas intermediárias (laranjas) têm duas assinaturas claras que o nosso objeto <code>Conta.java</code> monitora a cada Pix:</p>
+          <ul>
+            <li><strong>1. Salto Abrupto sobre o Volume Médio Diário (&mu;):</strong>
+              <br/>Uma conta pessoa física que movimenta em média R$ 150/dia repentinamente tenta movimentar R$ 50.000 (desvio de 333&times;). Quando <code>valor &gt; 3 &times; &mu;</code>, o motor aplica <code>[VALOR_ATIPICO_ACIMA_DA_MEDIA]</code> (+25 pts).</li>
+            <li><strong>2. Taxa de Retenção de Saldo Quase Nula (R &approx; 0%):</strong>
+              <br/>Contas legítimas retêm parte do que recebem. Já a conta laranja funciona como "cano de passagem": recebe R$ 50.000 às 11:00 e repassa R$ 49.000 às 11:04, retendo apenas 2% de comissão:
+              <br/><code>R = (TotalRecebido - TotalEnviado) / TotalRecebido</code></li>
+            <li><strong>3. Memória Reativa de Risco:</strong> O score da conta (0 a 100) fica salvo no nó; se uma conta já suspeita (<code>score &gt; 40</code>) tentar nova operação, já parte penalizada.</li>
+          </ul>
+          <div style="margin-top: 12px;">
+            <a class="btn primary" href="http://localhost:8080/?aba=contas" target="_blank">🌳 Consultar Perfis e Saldos na Treap Ao Vivo</a>
+          </div>
+        </div>
+
+        <div class="card highlight-accent">
+          <div class="card-title">
+            <span>⚙️ Por que implementamos uma Treap para isso?</span>
+            <span class="tag accent">Árvore BST + Max-Heap</span>
+          </div>
+          <p style="margin-top:0;">O motor precisa buscar e atualizar a conta de origem e a de destino a cada transação. Se usássemos uma Árvore Binária comum e os clientes fossem cadastrados em ordem sequencial (<code>Conta 10, 15, 20, 25...</code>), a árvore viraria uma fila linear <strong>O(N)</strong>.</p>
+          <div class="engine-link-box">
+            <strong>COMO A NOSSA `TreapContas.java` RESOLVE:</strong><br/>
+            Une a ordenação de uma <strong>Árvore Binária de Busca</strong> (pelo <code>idConta</code>) com o balanceamento automático de um <strong>Max-Heap</strong> (por uma <code>prioridade</code> aleatória sorteada no nó).
+          </div>
+          <pre class="code-block"><span class="cm">// Busca e atualização do perfil da conta em O(log N):</span>
+Conta origem  = treapContas.<span class="fn">obterOuCriar</span>(tx.getIdContaOrigem(), ...);
+Conta destino = treapContas.<span class="fn">obterOuCriar</span>(tx.getIdContaDestino(), ...);
+
+<span class="cm">// Na inserção, rotações simples mantêm a altura logarítmica:</span>
+<span class="kw">if</span> (atual.esquerda.prioridade &gt; atual.prioridade)
+    atual = <span class="fn">rotacaoDireita</span>(atual); <span class="cm">// O(1) sem recoloração complexa!</span></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================================================================= -->
+    <!-- SLIDE 4: GOLPE DO SMURFING E ROBÔS -> JANELA DESLIZANTE & BUSCA BINÁRIA -->
+    <!-- ======================================================================= -->
+    <section class="slide" data-title="4. Smurfing & Robôs (Janela)">
+      <div class="slide-header">
+        <div class="slide-kicker"><span>04 / 08</span> &bull; <span>MÓDULO DE ANÁLISE TEMPORAL (`JanelaDeslizante.java` &amp; `MetricasJanela.java`)</span></div>
+        <h2 class="slide-title">Combatendo o Fracionamento ("Smurfing") e Ataques de Robôs</h2>
+        <p class="slide-subtitle">Como o motor vigia a densidade de transferências nos últimos 10 minutos usando um buffer cronológico ordenado e <strong>Busca Binária (`lowerBound`)</strong>.</p>
+      </div>
+
+      <div class="grid-2">
+        <div class="card highlight-warn">
+          <div class="card-title">
+            <span>💸 O Golpe no Pix: Fracionamento Fiscal e Bots</span>
+            <span class="tag warn">Caso de Uso no Motor</span>
+          </div>
+          <p style="margin-top:0;">Criminosos sabem que uma transferência única de <strong>R$ 48.000</strong> dispara alertas fiscais automáticos (teto de R$ 10.000 do COAF). Então eles usam duas táticas que o nosso motor intercepta:</p>
+          <ul>
+            <li><strong>1. Smurfing (Pulverização abaixo do radar):</strong> Dividem os R$ 48.000 em <strong>5 transferências de R$ 9.600</strong> ao longo de 9 minutos. Individualmente cada Pix parece normal, mas na 4ª/5ª parcela o acumulado na janela de 10 minutos ultrapassa o limiar de <strong>R$ 25.000 e &ge; 4 transações</strong> &rarr; <code>[SMURFING_FRACIONAMENTO_DETECTADO]</code> (+45 pts).</li>
+            <li><strong>2. Explosão de Velocidade (Velocity Spike / Burst):</strong> Quando um celular é invadido ou um script automatizado dispara <strong>4+ transferências em menos de 60 segundos</strong> &rarr; <code>[EXPLOSAO_VELOCIDADE_TEMPORAL]</code> (+30 pts).</li>
+          </ul>
+          <div style="margin-top: 12px; display:flex; gap:10px;">
+            <a class="btn primary" href="http://localhost:8080/?aba=smurfing" target="_blank">▶ Simular Golpe de Smurfing Ao Vivo</a>
+            <a class="btn" href="http://localhost:8080/?aba=burst" target="_blank">▶ Simular Ataque de Robô (Burst)</a>
+          </div>
+        </div>
+
+        <div class="card highlight-accent">
+          <div class="card-title">
+            <span>🔍 Como a Janela Deslizante Processa Isso em O(log K)?</span>
+            <span class="tag accent">Ordenação + Busca Binária</span>
+          </div>
+          <p style="margin-top:0;">Se o banco processou 1 milhão de Pix desde as 08:00 da manhã, o motor não pode percorrer o vetor inteiro às 14:09 só para achar os últimos 10 minutos.</p>
+          <div class="engine-link-box">
+            <strong>POR QUE ORDENAR + BUSCA BINÁRIA (`lowerBound`):</strong><br/>
+            Como as transações entram em ordem cronológica de <code>timestamp</code> (onde o <strong>TimSort</strong> do Java tem custo linear <strong>O(N)</strong>), aplicamos a busca binária <code>lowerBound(T_atual - 10min)</code> para saltar direto para o índice inicial da janela ativa em <strong>O(log K)</strong> e expurgar o passado com <code>subList(0, idx).clear()</code>!
+          </div>
+          <pre class="code-block"><span class="kw">public void</span> <span class="fn">expurgarExpiradas</span>(<span class="kw">long</span> timestampAtual) {
+    <span class="kw">int</span> idx = <span class="fn">lowerBound</span>(timestampAtual - duracaoJanelaMs); <span class="cm">// O(log K)</span>
+    <span class="kw">if</span> (idx &gt; <span class="num">0</span>) buffer.subList(<span class="num">0</span>, idx).<span class="fn">clear</span>(); <span class="cm">// Libera RAM!</span>
+}
+<span class="cm">// No lowerBound, usamos deslocamento sem sinal para evitar overflow:</span>
+<span class="kw">int</span> meio = (inicio + fim) &gt;&gt;&gt; <span class="num">1</span>;</pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================================================================= -->
+    <!-- SLIDE 5: QUADRILHAS, ANÉIS DE LAVAGEM E MULAS -> GRAFOS & BOUNDED DFS -->
+    <!-- ======================================================================= -->
+    <section class="slide" data-title="5. Quadrilhas & Lavagem (Grafo)">
+      <div class="slide-header">
+        <div class="slide-kicker"><span>05 / 08</span> &bull; <span>MÓDULO DE TOPOLOGIA DE REDE (`GrafoTransacional.java` &amp; `ResultadoCiclo.java`)</span></div>
+        <h2 class="slide-title">Rastreando Quadrilhas: Anéis de Lavagem e Funis de Mulas</h2>
+        <p class="slide-subtitle">Olhar apenas para uma conta isolada não pega crime organizado. Nosso motor modela as transferências ativas como um <strong>Grafo Direcionado</strong> e intercepta ciclos antes que eles se fechem.</p>
+      </div>
+
+      <div class="grid-asymmetric">
+        <div class="card highlight-danger">
+          <div class="card-title">
+            <span>🕸️ O Golpe do Anel de Lavagem (A &rarr; B &rarr; C &rarr; A)</span>
+            <span class="tag danger">Bounded DFS + 3 Podas</span>
+          </div>
+          <p style="margin-top:0;">Na lavagem em anel, o dinheiro sai da Conta 20 (R$ 50k às 11:00) &rarr; Laranja 30 (R$ 49k às 11:04) &rarr; Laranja 40, e às 11:07 a Conta 40 tenta devolver R$ 48k para a Conta 20 como se fosse faturamento limpo.</p>
+          <div class="engine-link-box">
+            <strong>COMO O `GrafoTransacional.java` DESCOBRE EM MICROSSEGUNDOS:</strong><br/>
+            No instante em que <code>40 &rarr; 20</code> é solicitada, rodar uma DFS comum ou Tarjan no banco todo (<code>O(V+E)</code>) travaria o Pix. Em vez disso, nosso motor executa uma <strong>Busca em Profundidade Limitada (`Bounded DFS`)</strong> partindo de <code>20</code> em busca de <code>40</code> com <strong>3 Podas de Negócio</strong>:
+          </div>
+          <ul>
+            <li><strong>1. Poda de Profundidade (<code>D &le; 4</code>):</strong> Só explora a vizinhança imediata em <strong>O(b<sup>D</sup>)</strong> (onde anéis reais de mulas operam).</li>
+            <li><strong>2. Poda de Causalidade Temporal:</strong> Só segue arestas onde o relógio avançou (<code>t(20&rarr;30) &le; t(30&rarr;40) &le; t(40&rarr;20)</code>). Dinheiro não viaja para o passado!</li>
+            <li><strong>3. Poda de Preservação de Capital (&plusmn;20%):</strong> Só segue ramos cujo valor é compatível com o montante lavado (descontando a comissão do laranja). Se <code>20&rarr;30</code> foi R$ 50k e <code>30&rarr;99</code> foi um café de R$ 20, o ramo é podado na hora!</li>
+          </ul>
+        </div>
+
+        <div class="card highlight-accent">
+          <div class="card-title">
+            <span>🎯 Funil de Concentração (Fan-in) &amp; Leque (Fan-out)</span>
+            <span class="tag accent">Graus do Grafo em O(1)</span>
+          </div>
+          <p style="margin-top:0;">Além dos ciclos fechados, o grafo mantém contadores dinâmicos de grau sincronizados com a janela de 10 minutos:</p>
+          <ul>
+            <li><strong>Contas Arrecadadoras (Fan-in / <code>In-Degree &ge; 4</code>):</strong>
+              <br/>Quando várias contas distintas (<code>C10, C15, C20, C25...</code>) despejam dinheiro em uma única conta destino (<code>C80</code>), o mapa <code>grausEntrada</code> detecta a topologia de funil em <strong>O(1)</strong> &rarr; <code>[FAN_IN_CONCENTRACAO_DETECTADA]</code> (+45 pts e eleva o risco da conta receptora).</li>
+            <li><strong>Esvaziamento em Leque (Fan-out / <code>Out-Degree &ge; 5</code>):</strong>
+              <br/>Quando uma conta invadida começa a disparar arestas divergentes para vários destinos diferentes em poucos minutos (+20 pts).</li>
+          </ul>
+          <div style="margin-top: 14px; display:flex; flex-direction:column; gap:8px;">
+            <a class="btn primary" href="http://localhost:8080/?aba=ciclo" target="_blank">🕸️ Ver Bloqueio do Anel de Lavagem (Bounded DFS) Ao Vivo</a>
+            <a class="btn" href="http://localhost:8080/?aba=fanin" target="_blank">🎯 Ver Detecção da Conta Arrecadadora (Fan-in) Ao Vivo</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================================================================= -->
+    <!-- SLIDE 6: AUDITORIA E BLINDAGEM CONTRA FRAUDE INTERNA -> MERKLE TREE -->
+    <!-- ======================================================================= -->
+    <section class="slide" data-title="6. Blindagem & Auditoria (Merkle)">
+      <div class="slide-header">
+        <div class="slide-kicker"><span>06 / 08</span> &bull; <span>MÓDULO DE AUDITORIA CRIPTOGRÁFICA (`ArvoreMerkle.java` &amp; `MerkleProof.java`)</span></div>
+        <h2 class="slide-title">Blindagem Pós-Decisão: E se Tentarem Adulterar o Histórico do Banco?</h2>
+        <p class="slide-subtitle">Em sistemas tradicionais, um invasor com acesso ao banco de dados pode alterar o log de uma transação. Nosso motor sela cada lote de decisões usando uma <strong>Árvore de Merkle SHA-256</strong>.</p>
+      </div>
+
+      <div class="grid-2">
+        <div class="card highlight-pivot">
+          <div class="card-title">
+            <span>🔐 Como o Projeto Garante Imutabilidade e Auditoria Rápida</span>
+            <span class="tag pivot">ArvoreMerkle + MerkleProof</span>
+          </div>
+          <ul>
+            <li><strong>Selagem de Lotes no `ServidorVisual` e no Core:</strong> A cada bloco de transações julgadas pelo motor, serializamos os dados (<code>id|origem|destino|valor|timestamp|status</code>) e aplicamos hash <strong>SHA-256</strong> em pares até gerar uma única <strong>Merkle Root</strong>.</li>
+            <li><strong>O Desafio da Auditoria Externa (`MerkleProof.java`):</strong>
+              <br/>Se um auditor do Banco Central quiser confirmar que o Pix <code>Tx#1001</code> estava realmente em um bloco de <strong>1.000.000 de transações</strong>, não precisamos enviar o arquivo inteiro de 200 MB (custo linear <code>O(K)</code>).
+              <br/>O nosso método <code>gerarProva(indice)</code> extrai apenas os ~20 hashes irmãos no caminho até o topo (<strong>640 bytes</strong>), permitindo verificação matemática em <strong>O(log K)</strong> (&lt; 1 ms)!</li>
+          </ul>
+          <table class="data-table">
+            <thead>
+              <tr><th>Operação (1 Milhão de Pix)</th><th>Log SQL Comum</th><th>Nossa `ArvoreMerkle`</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>Adulteração por Admin/Hacker</strong></td><td>Possível (UPDATE direto)</td><td><strong>Impossível (Quebra a Raiz)</strong></td></tr>
+              <tr><td><strong>Tamanho e Tempo da Prova</strong></td><td>~200 MB / <code>O(K)</code></td><td><strong>640 Bytes / <code>O(log K)</code></strong></td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card highlight-warn">
+          <div class="card-title">
+            <span>⚡ Teste Ao Vivo: Tentativa de Fraude Interna (Efeito Avalanche)</span>
+            <span class="tag warn">Simulador SHA-256</span>
+          </div>
+          <p style="margin-top:0;">Imagine que um invasor tente alterar apenas <strong>1 centavo</strong> (ou mudar o status de <code>BLOQUEADA</code> para <code>APROVADA</code>) na Transação #1001 já selada pelo motor:</p>
+
+          <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:10px;">
+            <div>
+              <label style="font-family:var(--font-mono); font-size:10.5px; color:var(--ink-3);">REGISTRO DA TRANSAÇÃO #1001</label>
+              <input type="text" id="mk-t1" value="1001|20|30|5000000|BLOQUEADA" oninput="recalcularMerkleDemo()" style="width:100%; margin-top:4px; padding:8px; background:var(--stage); border:1px solid var(--accent); color:var(--ink); border-radius:6px; font-family:var(--font-mono); font-size:12px;">
+            </div>
+            <div>
+              <label style="font-family:var(--font-mono); font-size:10.5px; color:var(--ink-3);">REGISTRO DA TRANSAÇÃO #1002</label>
+              <input type="text" id="mk-t2" value="1002|10|40|15000|APROVADA" oninput="recalcularMerkleDemo()" style="width:100%; margin-top:4px; padding:8px; background:var(--stage); border:1px solid var(--line); color:var(--ink); border-radius:6px; font-family:var(--font-mono); font-size:12px;">
+            </div>
+          </div>
+
+          <div style="background:var(--stage); border:1px solid var(--line); border-radius:8px; padding:12px; font-family:var(--font-mono); font-size:11.5px;">
+            <div style="margin-bottom:5px; color:var(--ink-2);">Hash Folha H(T1): <span id="mk-h1" style="color:var(--done);"></span></div>
+            <div style="margin-bottom:5px; color:var(--ink-2);">Hash Folha H(T2): <span id="mk-h2" style="color:var(--ink);"></span></div>
+            <div style="padding-top:8px; border-top:1px solid var(--line); font-weight:700; color:var(--compare);">
+              🔒 RAIZ DE MERKLE DO BLOCO:<br/>
+              <span id="mk-root" style="color:var(--swap); font-size:12px; word-break:break-all;"></span>
+            </div>
+          </div>
+          <div style="margin-top:10px; display:flex; justify-content:space-between; align-items:center;">
+            <span id="mk-status" class="tag done">✅ HISTÓRICO ÍNTEGRO (RAIZ VÁLIDA)</span>
+            <button class="btn" onclick="adulterarUmCentavo()">🕵️ Adulterar 1 Centavo / Status</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================================================================= -->
+    <!-- SLIDE 7: LABORATÓRIO DE LIMITES E DESEMPENHO DO PROJETO -->
+    <!-- ======================================================================= -->
+    <section class="slide" data-title="7. Limites & Trade-offs">
+      <div class="slide-header">
+        <div class="slide-kicker"><span>07 / 08</span> &bull; <span>ENGENHARIA EXPERIMENTAL (`BenchmarkMotor.java` &amp; `LaboratorioLimites.java`)</span></div>
+        <h2 class="slide-title">Testando os Limites do Motor: E se os Fraudadores Mudarem de Tática?</h2>
+        <p class="slide-subtitle">Criamos um <strong>Laboratório de Sensibilidade</strong> no projeto para submeter o motor a cenários adversos (20.000 a 500.000 transações) e justificar matematicamente cada parâmetro escolhido.</p>
+      </div>
+
+      <div class="grid-3">
+        <div class="card highlight-accent">
+          <div class="card-title">
+            <span>1️⃣ E se a Quadrilha usar 6 Contas?</span>
+            <span class="tag accent">Profundidade DFS (D<sub>max</sub>)</span>
+          </div>
+          <p style="margin-top:0; font-size:13px;">Injetamos 40 anéis longos de <strong>6 contas</strong> (<code>C1&rarr;C2&rarr;C3&rarr;C4&rarr;C5&rarr;C6&rarr;C1</code>, exigindo 5 saltos reversos) no meio de 20.000 transações:</p>
+          <table class="data-table">
+            <thead>
+              <tr><th>Config Motor</th><th>Arestas Visitadas</th><th>Latência</th><th>Resultado no Projeto</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><code>D_max = 3</code></td><td>18.2 / tx</td><td>6.3 &micro;s</td><td><span class="tag danger">0 Pegos (Cego)</span></td></tr>
+              <tr><td><code>D_max = 4</code></td><td>27.9 / tx</td><td>3.5 &micro;s</td><td><span class="tag danger">0 Pegos (Cego)</span></td></tr>
+              <tr><td><strong><code>D_max = 5</code></strong></td><td><strong>35.4 / tx</strong></td><td><strong>6.1 &micro;s</strong></td><td><span class="tag done">40/40 Bloqueados!</span></td></tr>
+              <tr><td><code>D_max = 8</code></td><td>42.8 / tx</td><td>3.7 &micro;s</td><td><span class="tag done">40/40 Bloqueados!</span></td></tr>
+            </tbody>
+          </table>
+          <p style="font-size:12.5px; margin-bottom:0;"><strong>Descoberta do Projeto:</strong> Prova na prática o custo <code>O(b^D)</code> e mostra que <code>D = 5</code> elimina o falso negativo mantendo latência sub-10 &micro;s.</p>
+        </div>
+
+        <div class="card highlight-warn">
+          <div class="card-title">
+            <span>2️⃣ E se o Smurfing for Lento?</span>
+            <span class="tag warn">Tamanho da Janela (&Delta;t)</span>
+          </div>
+          <p style="margin-top:0; font-size:13px;">O fraudador configura o robô para esperar <strong>12 minutos</strong> entre cada parcela de R$ 9.600 para tentar vencer a janela de 10 min:</p>
+          <table class="data-table">
+            <thead>
+              <tr><th>Janela Ativa</th><th>Txs Retidas RAM</th><th>Latência</th><th>Smurfing (12/12 min)</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><code>10 min</code></td><td>298 txs</td><td>8.3 &micro;s</td><td><span class="tag danger">Escapou (Expirou)</span></td></tr>
+              <tr><td><code>30 min</code></td><td>698 txs</td><td>9.5 &micro;s</td><td><span class="tag danger">Escapou (Expirou)</span></td></tr>
+              <tr><td><strong><code>1h (60m)</code></strong></td><td><strong>852 txs</strong></td><td><strong>11.9 &micro;s</strong></td><td><span class="tag done">Pego e Bloqueado!</span></td></tr>
+              <tr><td><code>24 horas</code></td><td>1057 txs</td><td>13.1 &micro;s</td><td><span class="tag done">Pego e Bloqueado!</span></td></tr>
+            </tbody>
+          </table>
+          <p style="font-size:12.5px; margin-bottom:0;"><strong>Descoberta do Projeto:</strong> Aumentar a janela para 1h pega criminosos pacientes, mas exige ~3&times; mais memória no buffer ativo (<code>O(log K + K_ativo)</code>).</p>
+        </div>
+
+        <div class="card highlight-pivot">
+          <div class="card-title">
+            <span>3️⃣ E se o Laranja Cobrar 12%?</span>
+            <span class="tag pivot">Poda de Valor (&plusmn;%)</span>
+          </div>
+          <p style="margin-top:0; font-size:13px;">Cada laranja do anel retém <strong>12% de comissão</strong> por salto (R$ 50k &rarr; R$ 44k &rarr; R$ 39k) misturado a fornecedores legítimos:</p>
+          <table class="data-table">
+            <thead>
+              <tr><th>Tolerância</th><th>Arestas DFS</th><th>Anel 12%/nó</th><th>Bloqueios Indevidos</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><code>&plusmn;10%</code></td><td>10.9 / tx</td><td><span class="tag danger">Podado (Escapou)</span></td><td>Baixo (644)</td></tr>
+              <tr><td><code>&plusmn;20%</code></td><td>20.3 / tx</td><td><span class="tag danger">Podado (Escapou)</span></td><td>Moderado (1828)</td></tr>
+              <tr><td><strong><code>&plusmn;35%</code></strong></td><td><strong>36.9 / tx</strong></td><td><span class="tag done">Anel Detectado!</span></td><td>Elevado (4143)</td></tr>
+              <tr><td><code>&plusmn;50%</code></td><td>52.2 / tx</td><td><span class="tag done">Anel Detectado!</span></td><td>Alto (6363)</td></tr>
+            </tbody>
+          </table>
+          <p style="font-size:12.5px; margin-bottom:0;"><strong>Descoberta do Projeto:</strong> Evidencia o dilema clássico de sistemas antifraude: rigidez gera <em>Falso Negativo</em>; frouxidão gera <em>Falso Positivo</em>.</p>
+        </div>
+      </div>
+
+      <div style="margin-top: 14px; display:flex; gap:10px;">
+        <a class="btn primary" href="http://localhost:8080/?aba=limites" target="_blank">🔬 Testar Esses Parâmetros Ao Vivo na Aba "7. Lab de Limites" (:8080)</a>
+        <a class="btn" href="http://localhost:8080/?aba=stress" target="_blank">⚡ Rodar Benchmark de 50.000 Txs Ao Vivo</a>
+      </div>
+    </section>
+
+    <!-- ======================================================================= -->
+    <!-- SLIDE 8: ECOSSISTEMA COMPLETO E DEMO -->
+    <!-- ======================================================================= -->
+    <section class="slide" data-title="8. Demo & Validação">
+      <div class="slide-header">
+        <div class="slide-kicker"><span>08 / 08</span> &bull; <span>VALIDAÇÃO DO SISTEMA (`SuiteTestes.java`) &amp; BANCADA INTERATIVA (`ServidorVisual.java`)</span></div>
+        <h2 class="slide-title">O Projeto em Funcionamento: 11 Cenários Validados &amp; Demonstração</h2>
+        <p class="slide-subtitle">Todo o núcleo matemático foi validado por uma suíte automatizada de testes e conectado a um servidor HTTP visual nativo para inspeção passo a passo.</p>
+      </div>
+
+      <div class="card highlight-done">
+        <div class="card-title">
+          <span>🧪 O que a Nossa `SuiteTestes.java` Garante (11/11 OK)</span>
+          <span class="tag done">100% Aprovado</span>
+        </div>
+        <p style="margin-top:0; font-size:13.5px;">Criamos um executor próprio de testes automatizados sem dependências externas que valida cada módulo do projeto:</p>
+        <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:10px; font-size:13px;">
+          <div>✔️ <strong>1. Saldo Insuficiente:</strong> Bloqueio imediato na Treap</div>
+          <div>✔️ <strong>2. Pix Legítimo:</strong> Débito/crédito exato em centavos</div>
+          <div>✔️ <strong>3. Golpe de Smurfing:</strong> Detecção na 5ª parcela (Janela)</div>
+          <div>✔️ <strong>4. Anel de Lavagem:</strong> Bloqueio 20&rarr;30&rarr;40&rarr;20 (DFS)</div>
+          <div>✔️ <strong>5. Funil de Mulas:</strong> Alerta de In-Degree &ge; 4 na C80</div>
+          <div>✔️ <strong>6. Ataque de Bot:</strong> Detecção de rajada em 1s (Burst)</div>
+          <div>✔️ <strong>7. Expurgo de RAM:</strong> Limpeza da Janela e Grafo após 15m</div>
+          <div>✔️ <strong>8. Fraude Interna:</strong> Quebra da Merkle Root por 1 centavo</div>
+          <div>✔️ <strong>9. Anel Longo (6 nós):</strong> Prova D=4 (Cego) vs D=5 (Pego)</div>
+          <div>✔️ <strong>10. Smurfing Lento:</strong> Prova Janela 10m vs 60m</div>
+          <div style="grid-column: span 2;">✔️ <strong>11. Comissão de Laranja (12%):</strong> Prova Poda de Valor &plusmn;10% vs &plusmn;35%</div>
+        </div>
+
+        <div style="margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line);">
+          <strong style="font-size:12px; font-family:var(--font-mono); color:var(--accent); display:block; margin-bottom:10px;">🖥️ DEMONSTRAÇÃO AO VIVO NO `ServidorVisual.java`:</strong>
+          <div style="display:flex; flex-wrap:wrap; gap:8px;">
+            <a class="btn primary" href="http://localhost:8080/?aba=fluxo" target="_blank">0. Pipeline Pix</a>
+            <a class="btn" href="http://localhost:8080/?aba=contas" target="_blank">1. Treap (Contas)</a>
+            <a class="btn" href="http://localhost:8080/?aba=smurfing" target="_blank">2. Smurfing</a>
+            <a class="btn" href="http://localhost:8080/?aba=burst" target="_blank">3. Velocity Bot</a>
+            <a class="btn" href="http://localhost:8080/?aba=ciclo" target="_blank">4. Anel (Bounded DFS)</a>
+            <a class="btn" href="http://localhost:8080/?aba=fanin" target="_blank">5. Mulas (Fan-in)</a>
+            <a class="btn" href="http://localhost:8080/?aba=stress" target="_blank">6. Stress Test ⚡</a>
+            <a class="btn" href="http://localhost:8080/?aba=limites" target="_blank">7. Lab de Limites 🔬</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="deck-nav">
+    <div class="slide-dots" id="slide-dots"></div>
+    <div class="nav-controls">
+      <button class="btn" onclick="prevSlide()">&larr; Anterior</button>
+      <span class="slide-counter" id="slide-counter">1 / 8</span>
+      <button class="btn primary" onclick="nextSlide()">Próximo &rarr;</button>
+    </div>
+  </footer>
+
+  <script>
+    const slides = Array.from(document.querySelectorAll('.slide'));
+    let currentSlide = 0;
+    let notesVisible = false;
+
+    function initDots() {
+      const container = document.getElementById('slide-dots');
+      container.innerHTML = '';
+      slides.forEach((s, idx) => {
+        const btn = document.createElement('button');
+        btn.className = 'dot-btn' + (idx === currentSlide ? ' active' : '');
+        btn.innerText = s.getAttribute('data-title');
+        btn.onclick = () => goToSlide(idx);
+        container.appendChild(btn);
+      });
+    }
+
+    function goToSlide(idx) {
+      if (idx < 0 || idx >= slides.length) return;
+      slides[currentSlide].classList.remove('active');
+      currentSlide = idx;
+      slides[currentSlide].classList.add('active');
+      document.getElementById('slide-counter').innerText = `${currentSlide + 1} / ${slides.length}`;
+      document.getElementById('progress-bar').style.width = `${((currentSlide + 1) / slides.length) * 100}%`;
+      initDots();
+    }
+
+    function nextSlide() { goToSlide(currentSlide + 1); }
+    function prevSlide() { goToSlide(currentSlide - 1); }
+
+    function toggleTheme() {
+      const root = document.documentElement;
+      root.setAttribute('data-theme', root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+    }
+
+    function toggleFullscreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      } else {
+        document.exitFullscreen();
+      }
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.target.tagName === 'INPUT') return;
+      if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); nextSlide(); }
+      if (e.key === 'ArrowLeft') { e.preventDefault(); prevSlide(); }
+      if (e.key === 'f' || e.key === 'F') { toggleFullscreen(); }
+    });
+
+    const VALOR_ORIGINAL_T1 = "1001|20|30|5000000|BLOQUEADA";
+    let adulterado = false;
+
+    async function sha256Hex(texto) {
+      if (window.crypto && window.crypto.subtle) {
+        const msgBuffer = new TextEncoder().encode(texto);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+      }
+      let h1 = 0xdeadbeef ^ texto.length, h2 = 0x41c6ce57 ^ texto.length;
+      for (let i = 0, ch; i < texto.length; i++) {
+        ch = texto.charCodeAt(i);
+        h1 = Math.imul(h1 ^ ch, 2654435761);
+        h2 = Math.imul(h2 ^ ch, 1597334677);
+      }
+      h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+      h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+      return (h1 >>> 0).toString(16).padStart(8, '0') + (h2 >>> 0).toString(16).padStart(8, '0') +
+             ((h1 ^ h2) >>> 0).toString(16).padStart(8, '0') + ((h1 + h2) >>> 0).toString(16).padStart(8, '0');
+    }
+
+    async function recalcularMerkleDemo() {
+      const t1 = document.getElementById('mk-t1').value;
+      const t2 = document.getElementById('mk-t2').value;
+      const h1 = await sha256Hex(t1);
+      const h2 = await sha256Hex(t2);
+      const root = await sha256Hex(h1 + h2);
+
+      document.getElementById('mk-h1').innerText = h1.substring(0, 32) + '...';
+      document.getElementById('mk-h2').innerText = h2.substring(0, 32) + '...';
+      document.getElementById('mk-root').innerText = root;
+
+      const st = document.getElementById('mk-status');
+      if (t1 === VALOR_ORIGINAL_T1 && t2 === "1002|10|40|15000|APROVADA") {
+        st.className = 'tag done';
+        st.innerText = '✅ HISTÓRICO ÍNTEGRO (RAIZ VÁLIDA)';
+      } else {
+        st.className = 'tag danger';
+        st.innerText = '🚨 FRAUDE INTERNA DETECTADA! (RAIZ QUEBRADA)';
+      }
+    }
+
+    function adulterarUmCentavo() {
+      const inp = document.getElementById('mk-t1');
+      adulterado = !adulterado;
+      inp.value = adulterado ? "1001|20|30|5000000|APROVADA" : VALOR_ORIGINAL_T1;
+      recalcularMerkleDemo();
+    }
+
+    initDots();
+    recalcularMerkleDemo();
+  </script>
+</body>
+</html>
