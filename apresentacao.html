@@ -472,7 +472,6 @@
       <span class="badge-pill">Prevenção de Fraudes Bancárias em Tempo Real (In-Memory)</span>
     </div>
     <div class="top-actions">
-      <button class="btn" onclick="toggleNotes()" id="btn-notes" title="Atalho: Tecla N">🎙️ Roteiro de Fala (N)</button>
       <button class="btn" onclick="toggleFullscreen()" title="Atalho: Tecla F">⛶ Tela Cheia (F)</button>
       <button class="btn" onclick="toggleTheme()">🌓 Tema</button>
       <a class="btn success" href="http://localhost:8080" target="_blank">🔬 Abrir Simulador Ao Vivo (:8080)</a>
@@ -540,11 +539,6 @@
           </ul>
         </div>
       </div>
-
-      <div class="speaker-notes">
-        <h5>🎙️ Roteiro de Fala (Slide 1):</h5>
-        <p>"Nosso projeto nasce de um problema real do sistema financeiro brasileiro: a velocidade dos golpes no Pix. Hoje, o MED 2.0 do Banco Central tenta recuperar o dinheiro depois que o golpe já aconteceu, mas as quadrilhas pulverizam o saldo entre contas laranjas em segundos. Por isso, construímos um Motor Antifraude Preventivo In-Memory: ele roda 100% na memória RAM e analisa o perfil da conta, o histórico recente e a rede de transferências em cerca de 4 microssegundos — bloqueando a fraude antes que o dinheiro saia da conta da vítima."</p>
-      </div>
     </section>
 
     <!-- ======================================================================= -->
@@ -608,11 +602,6 @@
       <div style="margin-top: 14px;">
         <a class="btn primary" href="http://localhost:8080/?aba=fluxo" target="_blank">▶ Ver um Pix Atravessando o Pipeline Ao Vivo (:8080)</a>
       </div>
-
-      <div class="speaker-notes">
-        <h5>🎙️ Roteiro de Fala (Slide 2):</h5>
-        <p>"Veja como o projeto funciona por dentro quando um Pix chega no MotorFraude.java: cada pergunta de negócio que o antifraude precisa fazer é respondida por uma estrutura de dados escolhida a dedo para não haver gargalo. Para achar e atualizar o perfil da conta no meio de milhões de clientes, usamos uma Treap; para vigiar os últimos 10 minutos de atividade, usamos uma Janela Deslizante ordenada com Busca Binária; para mapear quadrilhas e ciclos de lavagem, usamos um Grafo Direcionado com Busca em Profundidade Limitada; e para blindar o histórico de decisões, usamos uma Árvore de Merkle."</p>
-      </div>
     </section>
 
     <!-- ======================================================================= -->
@@ -664,11 +653,6 @@ Conta destino = treapContas.<span class="fn">obterOuCriar</span>(tx.getIdContaDe
     atual = <span class="fn">rotacaoDireita</span>(atual); <span class="cm">// O(1) sem recoloração complexa!</span></pre>
         </div>
       </div>
-
-      <div class="speaker-notes">
-        <h5>🎙️ Roteiro de Fala (Slide 3):</h5>
-        <p>"O primeiro módulo do nosso motor cuida do perfil individual de cada conta. No mundo real, uma conta laranja se entrega por dois fatores: ela movimenta valores muito acima da sua média diária histórica e tem taxa de retenção quase zero — ou seja, o dinheiro entra e sai quase inteiro em minutos. Para guardar milhões dessas contas na memória RAM e consultar qualquer uma instantaneamente mesmo quando os IDs são cadastrados em sequência, implementamos do zero a TreapContas: uma árvore que usa prioridades aleatórias de Max-Heap e rotações simples para garantir busca e atualização em O(log N)."</p>
-      </div>
     </section>
 
     <!-- ======================================================================= -->
@@ -715,11 +699,6 @@ Conta destino = treapContas.<span class="fn">obterOuCriar</span>(tx.getIdContaDe
 <span class="cm">// No lowerBound, usamos deslocamento sem sinal para evitar overflow:</span>
 <span class="kw">int</span> meio = (inicio + fim) &gt;&gt;&gt; <span class="num">1</span>;</pre>
         </div>
-      </div>
-
-      <div class="speaker-notes">
-        <h5>🎙️ Roteiro de Fala (Slide 4):</h5>
-        <p>"E se o fraudador tentar enganar a análise individual dividindo um roubo de 48 mil reais em 5 Pix de 9.600 reais para ficar abaixo do limite de 10 mil do Banco Central? É o golpe de Smurfing. Para pegá-lo sem estourar a memória RAM nem varrer milhões de transações antigas do dia, criamos a JanelaDeslizante.java. Como o buffer é mantido ordenado cronologicamente por timestamp, nosso motor executa uma Busca Binária lowerBound em O(log K) para cortar exatamente os últimos 10 minutos, apagar o que já expirou e somar o volume recente da conta."</p>
       </div>
     </section>
 
@@ -768,11 +747,6 @@ Conta destino = treapContas.<span class="fn">obterOuCriar</span>(tx.getIdContaDe
             <a class="btn" href="http://localhost:8080/?aba=fanin" target="_blank">🎯 Ver Detecção da Conta Arrecadadora (Fan-in) Ao Vivo</a>
           </div>
         </div>
-      </div>
-
-      <div class="speaker-notes">
-        <h5>🎙️ Roteiro de Fala (Slide 5):</h5>
-        <p>"Mas as fraudes mais sofisticadas não acontecem em uma conta só: elas acontecem em rede. No golpe do Anel de Lavagem, a Conta 20 envia 50 mil para o Laranja 30, que passa 49 mil para o Laranja 40, que tenta devolver 48 mil para a Conta 20. Para pegar isso antes de autorizar a última perna, modelamos o GrafoTransacional.java. Em vez de varrer milhões de clientes com uma DFS comum, nosso motor aplica uma Bounded DFS de até 4 saltos combinada com duas regras financeiras: causalidade temporal (cada transferência precisa ter ocorrido depois da anterior) e preservação de valor (tolerando até 20% de taxa do laranja). Quando o ciclo é confirmado, o Pix é bloqueado na hora e todas as 3 contas da quadrilha têm o risco elevado para 85 na Treap!"</p>
       </div>
     </section>
 
@@ -840,11 +814,6 @@ Conta destino = treapContas.<span class="fn">obterOuCriar</span>(tx.getIdContaDe
             <button class="btn" onclick="adulterarUmCentavo()">🕵️ Adulterar 1 Centavo / Status</button>
           </div>
         </div>
-      </div>
-
-      <div class="speaker-notes">
-        <h5>🎙️ Roteiro de Fala (Slide 6):</h5>
-        <p>"Depois que o motor decide aprovar ou bloquear um Pix, surge outro problema bancário grave: como garantir que ninguém — nem mesmo um administrador do banco ou hacker — altere o histórico retroativamente? Para isso construímos a ArvoreMerkle.java e a MerkleProof.java. Cada lote de transações gera uma Raiz de Merkle criptográfica via SHA-256. Como podemos testar aqui no slide, se alguém tentar mudar 1 centavo ou trocar BLOQUEADA por APROVADA, o efeito avalanche muda completamente a raiz do bloco, denunciando a fraude em O(log K)."</p>
       </div>
     </section>
 
@@ -924,15 +893,10 @@ Conta destino = treapContas.<span class="fn">obterOuCriar</span>(tx.getIdContaDe
         <a class="btn primary" href="http://localhost:8080/?aba=limites" target="_blank">🔬 Testar Esses Parâmetros Ao Vivo na Aba "7. Lab de Limites" (:8080)</a>
         <a class="btn" href="http://localhost:8080/?aba=stress" target="_blank">⚡ Rodar Benchmark de 50.000 Txs Ao Vivo</a>
       </div>
-
-      <div class="speaker-notes">
-        <h5>🎙️ Roteiro de Fala (Slide 7):</h5>
-        <p>"Um ponto que diferencia o nosso projeto é que nós não deixamos os parâmetros do motor fixos no escuro. Construímos o LaboratorioLimites.java e uma bancada interativa para responder: como o sistema reage se os criminosos mudarem de estratégia? Provamos três coisas na prática: primeiro, se a quadrilha usar um anel longo de 6 contas, a profundidade padrão D=4 não alcança a ponta final, mas ao mudar para D=5 no nosso laboratório, pegamos 100% dos anéis mantendo 6 microssegundos de latência. Segundo, se o robô de Smurfing espaçar os Pix a cada 12 minutos, basta ampliar a janela deslizante para 1 hora. E terceiro, medimos o equilíbrio entre falsos negativos e falsos positivos na poda de valor da DFS."</p>
-      </div>
     </section>
 
     <!-- ======================================================================= -->
-    <!-- SLIDE 8: ECOSSISTEMA COMPLETO, DEMO E PERGUNTAS -->
+    <!-- SLIDE 8: ECOSSISTEMA COMPLETO E DEMO -->
     <!-- ======================================================================= -->
     <section class="slide" data-title="8. Demo & Validação">
       <div class="slide-header">
@@ -941,73 +905,39 @@ Conta destino = treapContas.<span class="fn">obterOuCriar</span>(tx.getIdContaDe
         <p class="slide-subtitle">Todo o núcleo matemático foi validado por uma suíte automatizada de testes e conectado a um servidor HTTP visual nativo para inspeção passo a passo.</p>
       </div>
 
-      <div class="grid-2">
-        <div class="card highlight-done">
-          <div class="card-title">
-            <span>🧪 O que a Nossa `SuiteTestes.java` Garante (11/11 OK)</span>
-            <span class="tag done">100% Aprovado</span>
-          </div>
-          <p style="margin-top:0; font-size:13px;">Criamos um executor próprio de testes automatizados sem dependências externas que valida cada módulo do projeto:</p>
-          <div style="display:grid; grid-template-columns: 1fr 1fr; gap:6px; font-size:12.5px;">
-            <div>✔️ <strong>1. Saldo Insuficiente:</strong> Bloqueio imediato na Treap</div>
-            <div>✔️ <strong>2. Pix Legítimo:</strong> Débito/crédito exato em centavos</div>
-            <div>✔️ <strong>3. Golpe de Smurfing:</strong> Detecção na 5ª parcela (Janela)</div>
-            <div>✔️ <strong>4. Anel de Lavagem:</strong> Bloqueio 20&rarr;30&rarr;40&rarr;20 (DFS)</div>
-            <div>✔️ <strong>5. Funil de Mulas:</strong> Alerta de In-Degree &ge; 4 na C80</div>
-            <div>✔️ <strong>6. Ataque de Bot:</strong> Detecção de rajada em 1s (Burst)</div>
-            <div>✔️ <strong>7. Expurgo de RAM:</strong> Limpeza da Janela e Grafo após 15m</div>
-            <div>✔️ <strong>8. Fraude Interna:</strong> Quebra da Merkle Root por 1 centavo</div>
-            <div>✔️ <strong>9. Anel Longo (6 nós):</strong> Prova D=4 (Cego) vs D=5 (Pego)</div>
-            <div>✔️ <strong>10. Smurfing Lento:</strong> Prova Janela 10m vs 60m</div>
-            <div style="grid-column: span 2;">✔️ <strong>11. Comissão de Laranja (12%):</strong> Prova Poda de Valor &plusmn;10% vs &plusmn;35%</div>
-          </div>
-
-          <div style="margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line);">
-            <strong style="font-size:11.5px; font-family:var(--font-mono); color:var(--accent); display:block; margin-bottom:8px;">🖥️ ROTEIRO DE DEMONSTRAÇÃO AO VIVO NO `ServidorVisual.java`:</strong>
-            <div style="display:flex; flex-wrap:wrap; gap:6px;">
-              <a class="btn primary" href="http://localhost:8080/?aba=fluxo" target="_blank">0. Pipeline Pix</a>
-              <a class="btn" href="http://localhost:8080/?aba=contas" target="_blank">1. Treap (Contas)</a>
-              <a class="btn" href="http://localhost:8080/?aba=smurfing" target="_blank">2. Smurfing</a>
-              <a class="btn" href="http://localhost:8080/?aba=burst" target="_blank">3. Velocity Bot</a>
-              <a class="btn" href="http://localhost:8080/?aba=ciclo" target="_blank">4. Anel (Bounded DFS)</a>
-              <a class="btn" href="http://localhost:8080/?aba=fanin" target="_blank">5. Mulas (Fan-in)</a>
-              <a class="btn" href="http://localhost:8080/?aba=stress" target="_blank">6. Stress Test ⚡</a>
-              <a class="btn" href="http://localhost:8080/?aba=limites" target="_blank">7. Lab de Limites 🔬</a>
-            </div>
-          </div>
+      <div class="card highlight-done">
+        <div class="card-title">
+          <span>🧪 O que a Nossa `SuiteTestes.java` Garante (11/11 OK)</span>
+          <span class="tag done">100% Aprovado</span>
+        </div>
+        <p style="margin-top:0; font-size:13.5px;">Criamos um executor próprio de testes automatizados sem dependências externas que valida cada módulo do projeto:</p>
+        <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:10px; font-size:13px;">
+          <div>✔️ <strong>1. Saldo Insuficiente:</strong> Bloqueio imediato na Treap</div>
+          <div>✔️ <strong>2. Pix Legítimo:</strong> Débito/crédito exato em centavos</div>
+          <div>✔️ <strong>3. Golpe de Smurfing:</strong> Detecção na 5ª parcela (Janela)</div>
+          <div>✔️ <strong>4. Anel de Lavagem:</strong> Bloqueio 20&rarr;30&rarr;40&rarr;20 (DFS)</div>
+          <div>✔️ <strong>5. Funil de Mulas:</strong> Alerta de In-Degree &ge; 4 na C80</div>
+          <div>✔️ <strong>6. Ataque de Bot:</strong> Detecção de rajada em 1s (Burst)</div>
+          <div>✔️ <strong>7. Expurgo de RAM:</strong> Limpeza da Janela e Grafo após 15m</div>
+          <div>✔️ <strong>8. Fraude Interna:</strong> Quebra da Merkle Root por 1 centavo</div>
+          <div>✔️ <strong>9. Anel Longo (6 nós):</strong> Prova D=4 (Cego) vs D=5 (Pego)</div>
+          <div>✔️ <strong>10. Smurfing Lento:</strong> Prova Janela 10m vs 60m</div>
+          <div style="grid-column: span 2;">✔️ <strong>11. Comissão de Laranja (12%):</strong> Prova Poda de Valor &plusmn;10% vs &plusmn;35%</div>
         </div>
 
-        <div class="card highlight-accent">
-          <div class="card-title">
-            <span>💬 Perguntas Frequentes sobre as Escolhas do Projeto</span>
-            <span class="tag">Defesa Técnica</span>
+        <div style="margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line);">
+          <strong style="font-size:12px; font-family:var(--font-mono); color:var(--accent); display:block; margin-bottom:10px;">🖥️ DEMONSTRAÇÃO AO VIVO NO `ServidorVisual.java`:</strong>
+          <div style="display:flex; flex-wrap:wrap; gap:8px;">
+            <a class="btn primary" href="http://localhost:8080/?aba=fluxo" target="_blank">0. Pipeline Pix</a>
+            <a class="btn" href="http://localhost:8080/?aba=contas" target="_blank">1. Treap (Contas)</a>
+            <a class="btn" href="http://localhost:8080/?aba=smurfing" target="_blank">2. Smurfing</a>
+            <a class="btn" href="http://localhost:8080/?aba=burst" target="_blank">3. Velocity Bot</a>
+            <a class="btn" href="http://localhost:8080/?aba=ciclo" target="_blank">4. Anel (Bounded DFS)</a>
+            <a class="btn" href="http://localhost:8080/?aba=fanin" target="_blank">5. Mulas (Fan-in)</a>
+            <a class="btn" href="http://localhost:8080/?aba=stress" target="_blank">6. Stress Test ⚡</a>
+            <a class="btn" href="http://localhost:8080/?aba=limites" target="_blank">7. Lab de Limites 🔬</a>
           </div>
-
-          <details class="faq-item" open>
-            <summary>1. Como a Busca Binária e o laço na Janela Deslizante dividem o trabalho?</summary>
-            <p>A Busca Binária (<code>lowerBound</code> em <strong>O(log K)</strong>) corta instantaneamente o histórico expirado e libera memória em lote com <code>subList(0, idx).clear()</code>. Assim, a agregação de volume da conta só caminha sobre a janela ativa recente (<code>K_ativo</code>).</p>
-          </details>
-
-          <details class="faq-item">
-            <summary>2. Por que o projeto não usa o algoritmo de Tarjan para achar ciclos no grafo?</summary>
-            <p>Porque o Tarjan varre o grafo inteiro (<strong>O(V + E)</strong>), o que é inviável para aprovar um Pix em menos de 50 ms em um banco com milhões de clientes. A nossa <em>Bounded DFS</em> olha apenas a vizinhança da conta destino com 3 podas financeiras, visitando ~28 arestas em ~4 &micro;s.</p>
-          </details>
-
-          <details class="faq-item">
-            <summary>3. Qual a vantagem real da Treap para armazenar as contas do motor?</summary>
-            <p>Mantém as contas estritamente ordenadas por ID em memória (permitindo listagem ordenada de extratos e buscas por intervalo) e evita a degeneração <strong>O(N)</strong> de inserções sequenciais usando rotações simples guiadas por prioridades aleatórias (Max-Heap) em <strong>O(log N)</strong>.</p>
-          </details>
-
-          <details class="faq-item">
-            <summary>4. Como o projeto evolui para um ambiente bancário distribuído?</summary>
-            <p>O núcleo em memória continua idêntico (garantindo os ~250k TPS), acoplado a filas assíncronas (Apache Kafka), snapshots periódicos da Treap/Grafo em Redis, persistência dos blocos Merkle em PostgreSQL e score híbrido com Machine Learning.</p>
-          </details>
         </div>
-      </div>
-
-      <div class="speaker-notes">
-        <h5>🎙️ Roteiro de Fala (Slide 8):</h5>
-        <p>"Para garantir que nenhuma regra de negócio ou estrutura falhe sob pressão, criamos a SuiteTestes.java com 11 cenários automatizados cobrindo todas as fraudes e limites do motor. Além disso, construímos o ServidorVisual.java para enxergar os algoritmos trabalhando em tempo real. Agora vou abrir a bancada ao vivo para demonstrar uma tentativa de lavagem de dinheiro sendo interceptada passo a passo!"</p>
       </div>
     </section>
 
@@ -1052,16 +982,6 @@ Conta destino = treapContas.<span class="fn">obterOuCriar</span>(tx.getIdContaDe
     function nextSlide() { goToSlide(currentSlide + 1); }
     function prevSlide() { goToSlide(currentSlide - 1); }
 
-    function toggleNotes() {
-      notesVisible = !notesVisible;
-      document.querySelectorAll('.speaker-notes').forEach(el => {
-        el.classList.toggle('visible', notesVisible);
-      });
-      const btn = document.getElementById('btn-notes');
-      btn.style.borderColor = notesVisible ? 'var(--accent)' : '';
-      btn.style.color = notesVisible ? 'var(--accent)' : '';
-    }
-
     function toggleTheme() {
       const root = document.documentElement;
       root.setAttribute('data-theme', root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
@@ -1079,7 +999,6 @@ Conta destino = treapContas.<span class="fn">obterOuCriar</span>(tx.getIdContaDe
       if (e.target.tagName === 'INPUT') return;
       if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); nextSlide(); }
       if (e.key === 'ArrowLeft') { e.preventDefault(); prevSlide(); }
-      if (e.key === 'n' || e.key === 'N') { toggleNotes(); }
       if (e.key === 'f' || e.key === 'F') { toggleFullscreen(); }
     });
 
